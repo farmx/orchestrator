@@ -1,16 +1,12 @@
 package orchestrator
 
-import (
-	"fmt"
-	"strings"
-)
+type transactionState string
 
 const (
-	transactionStateEventKey = "TRANSACTION_SATE_EVENT"
-
-	inProgress = "IN_PROGRESS"
-	rollback   = "ROLLBACK"
-	done       = "DONE"
+	Start      transactionState = "START"
+	InProgress transactionState = "IN_PROGRESS"
+	Rollback   transactionState = "ROLLBACK"
+	Closed     transactionState = "CLOSED"
 )
 
 type route struct {
@@ -18,7 +14,7 @@ type route struct {
 	journald    journald
 	steps       []transactionStep
 	currentStep int
-	status      string
+	state       transactionState
 }
 
 type transactionStep interface {
@@ -29,10 +25,9 @@ type transactionStep interface {
 func newRoute(routeId string) *route {
 	return &route{
 		id:          routeId,
-		journald:    getJournaldInstance(),
+		journald:    getFileJournaldInstance(routeId),
 		steps:       []transactionStep{},
 		currentStep: 0,
-		status:      inProgress,
 	}
 }
 
@@ -42,12 +37,15 @@ func (r *route) AddNextStep(step transactionStep) *route {
 }
 
 func (r *route) Execute(ctx context) error {
+	r.startTransaction(ctx)
+
 	err := r.process(&ctx)
 
 	if err != nil {
 		r.rollback(ctx)
 	}
 
+	r.closeTransaction(ctx)
 	return err
 }
 
@@ -61,12 +59,11 @@ func (r *route) process(ctx *context) error {
 		r.logState(*ctx)
 	}
 
-	r.closeTransaction(*ctx)
 	return nil
 }
 
 func (r *route) rollback(ctx context) {
-	r.status = rollback
+	r.state = Rollback
 
 	for ; r.currentStep >= 0; r.currentStep-- {
 		r.steps[r.currentStep].failed(ctx)
@@ -74,41 +71,43 @@ func (r *route) rollback(ctx context) {
 	}
 }
 
-func (r *route) recoverLastState(gid string) error {
-	processKey := r.keyGen(transactionStateEventKey, gid)
-	data, err := r.journald.getLastEvent(processKey)
+func (r *route) recoverLastState() error {
+	data, err := r.journald.getLastEvent()
 	if err != nil {
 		return err
 	}
 
-	r.status = fmt.Sprintf("%v", data[0])
-	if r.status == done {
+	r.state = data[0].(transactionState)
+	if r.state == Closed {
 		return nil
 	}
 
 	r.currentStep = data[1].(int)
 	ctx := data[2].(context)
 
-	switch r.status {
-	case inProgress:
-		return r.process(&ctx)
-	case rollback:
+	switch r.state {
+	case Start:
+	case InProgress:
+		return r.Execute(ctx)
+	case Rollback:
 		r.rollback(ctx)
 	}
 
 	return nil
 }
 
-func (r *route) keyGen(primary string, secondary string) string {
-	return strings.Join([]string{primary, secondary}, "_")
+func (r *route) logState(ctx context) {
+	r.journald.appendLog(r.state, r.currentStep, ctx)
 }
 
-func (r *route) logState(ctx context) {
-	processKey := r.keyGen(transactionStateEventKey, ctx.getGuid())
-	r.journald.append(processKey, r.status, r.currentStep, ctx)
+func (r *route) startTransaction(ctx context) {
+	r.state = Start
+
+	r.logState(ctx)
 }
 
 func (r *route) closeTransaction(ctx context) {
-	processKey := r.keyGen(transactionStateEventKey, ctx.getGuid())
-	r.journald.append(processKey, done, r.currentStep)
+	r.state = Closed
+
+	r.logState(ctx)
 }

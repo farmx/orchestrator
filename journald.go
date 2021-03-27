@@ -1,16 +1,22 @@
 package orchestrator
 
-type journald struct {
+type journald interface {
+	appendLog(data ...interface{})
+	getLastEvent() ([]interface{}, error)
+}
+
+type fileJournald struct {
 }
 
 // singleton
-func getJournaldInstance() journald {
-	return journald{}
+func getFileJournaldInstance(id string) journald {
+	return &fileJournald{}
 }
 
-func (j *journald) append(key string, data ...interface{}) {
+func (fj *fileJournald) appendLog(data ...interface{}) {
+
 }
 
-func (j *journald) getLastEvent(key string) ([]interface{}, error) {
+func (fj *fileJournald) getLastEvent() ([]interface{}, error) {
 	return nil, nil
 }
