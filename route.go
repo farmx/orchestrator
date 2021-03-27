@@ -71,7 +71,7 @@ func (r *route) rollback(ctx context) {
 	}
 }
 
-func (r *route) recoverLastState() error {
+func (r *route) RecoverLastState() error {
 	data, err := r.journald.getLastEvent()
 	if err != nil {
 		return err
@@ -94,6 +94,10 @@ func (r *route) recoverLastState() error {
 	}
 
 	return nil
+}
+
+func (r *route) Shutdown() {
+	r.journald.shutdown()
 }
 
 func (r *route) logState(ctx context) {
