@@ -6,9 +6,9 @@ import (
 )
 
 type context struct {
-	guid string
+	gid    string
 	header map[string]interface{}
-	body interface{}
+	body   interface{}
 }
 
 func NewContext(body interface{}) (*context, error) {
@@ -23,7 +23,7 @@ func NewContextWithGuid(guid string, body interface{}) (*context, error) {
 	}
 
 	return &context{
-		guid: guid,
+		gid:  guid,
 		body: body,
 	}, nil
 }
@@ -49,5 +49,5 @@ func (ctx *context) setBody(body interface{}) {
 }
 
 func (ctx *context) getGuid() string {
-	return ctx.guid
+	return ctx.gid
 }
