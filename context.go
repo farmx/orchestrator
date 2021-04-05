@@ -17,13 +17,13 @@ func NewContext(body interface{}) (*context, error) {
 	return NewContextWithGuid(guid, body)
 }
 
-func NewContextWithGuid(guid string, body interface{}) (*context, error) {
-	if len(guid) < 1 {
-		return nil, errors.New("GUID is empty")
+func NewContextWithGuid(gid string, body interface{}) (*context, error) {
+	if len(gid) < 1 {
+		return nil, errors.New("GID is empty")
 	}
 
 	return &context{
-		gid:  guid,
+		gid:  gid,
 		body: body,
 	}, nil
 }
@@ -44,10 +44,6 @@ func (ctx *context) getBody() interface{} {
 	return ctx.body
 }
 
-func (ctx *context) setBody(body interface{}) {
-	ctx.body = body
-}
-
-func (ctx *context) getGuid() string {
+func (ctx *context) getGid() string {
 	return ctx.gid
 }

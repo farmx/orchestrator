@@ -1,6 +1,9 @@
 package orchestrator
 
+import "errors"
+
 type transactionState string
+type transactionStatus string
 
 const (
 	Start      transactionState = "START"
@@ -9,109 +12,149 @@ const (
 	Closed     transactionState = "CLOSED"
 )
 
+const (
+	Unknown transactionStatus = "UNKNOWN"
+	Success transactionStatus = "SUCCESS"
+	Fail    transactionStatus = "FAIL"
+)
+
 type route struct {
 	id          string
-	journald    journald
-	steps       []transactionStep
+	steps       []TransactionStep
 	currentStep int
 	state       transactionState
+	ctx         *context
+	status      transactionStatus
 }
 
-type transactionStep interface {
-	success(ctx *context) error
+type routeSnapshot struct {
+	routeId string
+	context context
+	step    int
+	status  transactionStatus
+	state   transactionState
+}
+
+type TransactionStep interface {
+	process(ctx *context) error
 	failed(ctx context)
 }
 
 func newRoute(routeId string) *route {
 	return &route{
 		id:          routeId,
-		journald:    getFileJournaldInstance(routeId),
-		steps:       []transactionStep{},
+		steps:       []TransactionStep{},
 		currentStep: 0,
 	}
 }
 
-func (r *route) AddNextStep(step transactionStep) *route {
+func (r *route) AddNextStep(step TransactionStep) *route {
 	r.steps = append(r.steps, step)
 	return r
 }
 
-func (r *route) Execute(ctx context) error {
-	r.startTransaction(ctx)
-
-	err := r.process(&ctx)
-
-	if err != nil {
-		r.rollback(ctx)
+func (r *route) initContext(ctx context) error {
+	if r.state == InProgress || r.state == Rollback {
+		return errors.New("can not change the context middle of the process")
 	}
 
-	r.closeTransaction(ctx)
-	return err
-}
-
-func (r *route) process(ctx *context) error {
-	for ; r.currentStep < len(r.steps); r.currentStep++ {
-
-		if err := r.steps[r.currentStep].success(ctx); err != nil {
-			return err
-		}
-
-		r.logState(*ctx)
-	}
+	r.status = Unknown
+	r.state = Start
+	r.ctx = &ctx
 
 	return nil
 }
 
-func (r *route) rollback(ctx context) {
-	r.state = Rollback
-
-	for ; r.currentStep >= 0; r.currentStep-- {
-		r.steps[r.currentStep].failed(ctx)
-		r.logState(ctx)
+func (r *route) hasNext() bool {
+	if r.state == Closed {
+		return false
 	}
+
+	processNotFinished := r.state == InProgress && r.currentStep < len(r.steps)
+	rollbackNotFinished := r.state == Rollback && r.currentStep >= 0
+
+	return processNotFinished || rollbackNotFinished
 }
 
-func (r *route) RecoverLastState() error {
-	data, err := r.journald.getLastEvent()
-	if err != nil {
-		return err
-	}
-
-	r.state = data[0].(transactionState)
-	if r.state == Closed {
-		return nil
-	}
-
-	r.currentStep = data[1].(int)
-	ctx := data[2].(context)
-
+func (r *route) execNextStep() (err error) {
 	switch r.state {
 	case Start:
 	case InProgress:
-		return r.Execute(ctx)
+		if err = r.process(); err != nil {
+			r.state = Rollback
+			// when a process failed, the previous step failed method must be called
+			r.currentStep--
+		}
 	case Rollback:
-		r.rollback(ctx)
+		r.rollback()
 	}
 
+	r.updateState()
+	return err
+}
+
+func (r *route) updateState() {
+	if r.currentStep == len(r.steps) {
+		r.status = Success
+		r.state = Closed
+	}
+
+	if r.currentStep < 0 {
+		r.status = Fail
+		r.state = Closed
+	}
+}
+
+func (r *route) process() error {
+	r.state = InProgress
+
+	if err := r.steps[r.currentStep].process(r.ctx); err != nil {
+		return err
+	}
+
+	r.currentStep++
 	return nil
 }
 
-func (r *route) Shutdown() {
-	r.journald.shutdown()
+func (r *route) rollback() {
+	r.state = Rollback
+
+	if r.currentStep >= 0 {
+		r.steps[r.currentStep].failed(*r.ctx)
+		r.currentStep--
+	}
 }
 
-func (r *route) logState(ctx context) {
-	r.journald.appendLog(r.state, r.currentStep, ctx)
+func (r *route) createMemento() string {
+	memento := &routeSnapshot{
+		routeId: r.id,
+		step:    r.currentStep,
+		state:   r.state,
+		status:  r.status,
+		context: *r.ctx,
+	}
+
+	// marshal json
+	return memento.routeId
 }
 
-func (r *route) startTransaction(ctx context) {
-	r.state = Start
+func (r *route) restore(memento routeSnapshot) error {
+	if memento.routeId == "" {
+		return errors.New("routeId is empty")
+	}
 
-	r.logState(ctx)
-}
+	if memento.step < 0 {
+		return errors.New("negative value does not allow for step")
+	}
 
-func (r *route) closeTransaction(ctx context) {
-	r.state = Closed
+	if memento.state != Start && memento.state != Closed && memento.state != InProgress && memento.state != Rollback {
+		return errors.New("invalid route state")
+	}
 
-	r.logState(ctx)
+	r.id = memento.routeId
+	r.currentStep = memento.step
+	r.state = memento.state
+	r.status = memento.status
+
+	return nil
 }
