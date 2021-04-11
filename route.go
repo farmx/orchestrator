@@ -1,6 +1,9 @@
 package orchestrator
 
-import "errors"
+import (
+	"encoding/json"
+	"errors"
+)
 
 type transactionState string
 type transactionStatus string
@@ -28,11 +31,11 @@ type route struct {
 }
 
 type routeSnapshot struct {
-	routeId string
-	context context
-	step    int
-	status  transactionStatus
-	state   transactionState
+	RouteId string
+	Context context
+	Step    int
+	Status  transactionStatus
+	State   transactionState
 }
 
 type TransactionStep interface {
@@ -70,6 +73,10 @@ func (r *route) hasNext() bool {
 		return false
 	}
 
+	if r.state == Start {
+		return true
+	}
+
 	processNotFinished := r.state == InProgress && r.currentStep < len(r.steps)
 	rollbackNotFinished := r.state == Rollback && r.currentStep >= 0
 
@@ -78,11 +85,10 @@ func (r *route) hasNext() bool {
 
 func (r *route) execNextStep() (err error) {
 	switch r.state {
-	case Start:
-	case InProgress:
+	case Start, InProgress:
 		if err = r.process(); err != nil {
 			r.state = Rollback
-			// when a process failed, the previous step failed method must be called
+			// On process failed, the previous step failed method must be called
 			r.currentStep--
 		}
 	case Rollback:
@@ -127,34 +133,39 @@ func (r *route) rollback() {
 
 func (r *route) createMemento() string {
 	memento := &routeSnapshot{
-		routeId: r.id,
-		step:    r.currentStep,
-		state:   r.state,
-		status:  r.status,
-		context: *r.ctx,
+		RouteId: r.id,
+		Step:    r.currentStep,
+		State:   r.state,
+		Status:  r.status,
+		Context: *r.ctx,
 	}
 
-	// marshal json
-	return memento.routeId
+	data, _ := json.Marshal(memento)
+	return string(data)
 }
 
-func (r *route) restore(memento routeSnapshot) error {
-	if memento.routeId == "" {
-		return errors.New("routeId is empty")
+func (r *route) restore(memento string) error {
+	var mem routeSnapshot
+	if err := json.Unmarshal([]byte(memento), &mem); err != nil {
+		return err
 	}
 
-	if memento.step < 0 {
-		return errors.New("negative value does not allow for step")
+	if mem.RouteId == "" {
+		return errors.New("RouteId is empty")
 	}
 
-	if memento.state != Start && memento.state != Closed && memento.state != InProgress && memento.state != Rollback {
-		return errors.New("invalid route state")
+	if mem.Step < 0 {
+		return errors.New("negative value does not allow for Step")
 	}
 
-	r.id = memento.routeId
-	r.currentStep = memento.step
-	r.state = memento.state
-	r.status = memento.status
+	if mem.State != Start && mem.State != Closed && mem.State != InProgress && mem.State != Rollback {
+		return errors.New("invalid route State")
+	}
+
+	r.id = mem.RouteId
+	r.currentStep = mem.Step
+	r.state = mem.State
+	r.status = mem.Status
 
 	return nil
 }
