@@ -51,7 +51,7 @@ func newRoute(routeId string) *route {
 	}
 }
 
-func (r *route) AddNextStep(step TransactionStep) *route {
+func (r *route) addNextStep(step TransactionStep) *route {
 	r.steps = append(r.steps, step)
 	return r
 }

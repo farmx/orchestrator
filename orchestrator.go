@@ -11,7 +11,6 @@ type orchestrator struct {
 //					                 \
 // 						              ---(No)--> route C
 // Restore route last State on warm-up
-// Graceful shutdown
 func NewOrchestrator() *orchestrator {
 	ck, _ := NewFileCareTacker(".")
 	return &orchestrator{
@@ -21,7 +20,7 @@ func NewOrchestrator() *orchestrator {
 }
 
 func (o *orchestrator) addProcess(step TransactionStep) {
-	o.defaultRoute.AddNextStep(step)
+	o.defaultRoute.addNextStep(step)
 }
 
 func (o *orchestrator) exec() error {
@@ -51,4 +50,8 @@ func (o *orchestrator) restoreLastState() error {
 	}
 
 	return o.defaultRoute.restore(mem)
+}
+
+func (o *orchestrator) shutdown() error {
+	return o.ck.shutdown()
 }
