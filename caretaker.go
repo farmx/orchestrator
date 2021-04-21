@@ -25,10 +25,12 @@ type logStr struct {
 	Data      string `json:"data"`
 }
 
-func NewFileCareTacker(basePath string) (*fileCaretaker, error) {
-	fileAddress := fmt.Sprintf("%s/journal.log", basePath)
+var basePath = "."
+
+func NewFileCareTacker(id string) (*fileCaretaker, error) {
+	fileAddress := fmt.Sprintf("%s/%s.log", basePath, id)
 	af, err := os.OpenFile(fileAddress,
-		os.O_APPEND|os.O_CREATE|os.O_RDWR,
+		os.O_APPEND|os.O_CREATE|os.O_WRONLY,
 		0644)
 
 	if err != nil {

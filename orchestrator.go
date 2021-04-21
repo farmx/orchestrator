@@ -1,57 +1,51 @@
 package orchestrator
 
+//  TODO: Inject chain failed strategy in each route
+/* Condition
+ * 			route A end --> condition --(yes)--> route B
+ *					                 \
+ * 						              ---(No)--> route C
+ */
+
+type condition interface {
+	condition(ctx context) bool
+}
+
 type orchestrator struct {
-	defaultRoute *route
-	ck           caretaker
+	//route id and route pointer map
+	routes map[string]*route
+
+	// router runner pointer
+	routeRunner *routeRunner
+
+	// keep executed route id
+	execPath []string
 }
 
-// TODO: Inject chain failed strategy in each route
-// TODO: Condition
-// 			route A end --> condition --(yes)--> route B
-//					                 \
-// 						              ---(No)--> route C
-// Restore route last State on warm-up
 func NewOrchestrator() *orchestrator {
-	ck, _ := NewFileCareTacker(".")
 	return &orchestrator{
-		defaultRoute: newRoute("default"),
-		ck:           ck,
+		routes: make(map[string]*route),
 	}
 }
 
-func (o *orchestrator) addProcess(step TransactionStep) {
-	o.defaultRoute.addNextStep(step)
+func (o *orchestrator) addProcess(step TransactionStep) *orchestrator {
+
+	return o
 }
 
-func (o *orchestrator) exec() error {
-	if err := o.restoreLastState(); err != nil {
-		ctx, _ := NewContext(nil)
-		o.defaultRoute.initContext(*ctx)
-	}
-
-	for o.defaultRoute.hasNext() {
-		if err := o.defaultRoute.execNextStep(); err != nil {
-			return err
-		}
-
-		mem := o.defaultRoute.createMemento()
-		if err := o.ck.persist(o.defaultRoute.id, mem); err != nil {
-			return err
-		}
-	}
-
-	return nil
+func (o *orchestrator) choice() *orchestrator {
+	// make graph
+	return o
 }
 
-func (o *orchestrator) restoreLastState() error {
-	mem, err := o.ck.get(o.defaultRoute.id)
-	if err != nil {
-		return err
-	}
+func (o *orchestrator) when(condition condition)  {
 
-	return o.defaultRoute.restore(mem)
+}
+
+func (o *orchestrator) exec() {
+
 }
 
 func (o *orchestrator) shutdown() error {
-	return o.ck.shutdown()
+	return o.routeRunner.shutdown()
 }

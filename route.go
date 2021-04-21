@@ -56,7 +56,7 @@ func (r *route) addNextStep(step TransactionStep) *route {
 	return r
 }
 
-func (r *route) initContext(ctx context) error {
+func (r *route) init(ctx context) error {
 	if r.state == InProgress || r.state == Rollback {
 		return errors.New("can not change the context middle of the process")
 	}
