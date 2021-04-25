@@ -31,13 +31,13 @@ func (f *fakeFailedStep) failed(ctx context) {
 }
 
 func TestAddNextStep(t *testing.T) {
-	r := newRoute("route")
+	r := newRoute("atomicRoute")
 
-	r.addNextStep(&fakeSuccessStep{}).
-		addNextStep(&fakeSuccessStep{}).
-		addNextStep(&fakeSuccessStep{}).
-		addNextStep(&fakeSuccessStep{}).
-		addNextStep(&fakeSuccessStep{})
+	r.addNextStep(&fakeSuccessStep{})
+	r.addNextStep(&fakeSuccessStep{})
+	r.addNextStep(&fakeSuccessStep{})
+	r.addNextStep(&fakeSuccessStep{})
+	r.addNextStep(&fakeSuccessStep{})
 
 	assert.Equal(t, 5, len(r.steps))
 }
@@ -90,7 +90,7 @@ func TestHasNext(t *testing.T) {
 func TestExecNextStep_rollbackOnProcessFailed(t *testing.T) {
 	r := newRoute("route_id")
 	ctx, _ := NewContext(nil)
-	r.initContext(*ctx)
+	r.init(*ctx)
 	r.addNextStep(&fakeSuccessStep{})
 	r.addNextStep(&fakeFailedStep{})
 
