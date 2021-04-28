@@ -3,7 +3,7 @@ package orchestrator
 import "testing"
 
 type passStep struct {
-	TransactionStep
+	TransactionalStep
 }
 
 func (ps *passStep) process(ctx *context) error {
@@ -17,16 +17,16 @@ func (ps *passStep) failed(ctx context) {
 
 func TestSample(t *testing.T) {
 	/*
-	orch := NewOrchestrator()
-	orch.addProcess(&passStep{}).
-		when().
-		addProcess().
-		addProcess().
-		elseThen().
-		addProcess().
-		end().end()
+		orch := NewOrchestrator()
+		orch.addProcess(&passStep{}).
+			when().
+			addProcess().
+			addProcess().
+			elseThen().
+			addProcess().
+			end().end()
 
-	orch.exec()
+		orch.exec()
 	*/
 
 	//if err := orch.exec(); err != nil {

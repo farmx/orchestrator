@@ -14,10 +14,10 @@ type context struct {
 func NewContext(body interface{}) (*context, error) {
 	guid := uuid.New().String()
 
-	return NewContextWithGuid(guid, body)
+	return NewContextWithGid(guid, body)
 }
 
-func NewContextWithGuid(gid string, body interface{}) (*context, error) {
+func NewContextWithGid(gid string, body interface{}) (*context, error) {
 	if len(gid) < 1 {
 		return nil, errors.New("GID is empty")
 	}

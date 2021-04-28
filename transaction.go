@@ -1,6 +1,5 @@
 package orchestrator
 
-
 type transactionState string
 type transactionStatus string
 
@@ -17,7 +16,7 @@ const (
 	Fail    transactionStatus = "FAIL"
 )
 
-type TransactionStep interface {
+type TransactionalStep interface {
 	process(ctx *context) error
 	failed(ctx context)
 }

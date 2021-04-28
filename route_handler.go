@@ -1,11 +1,11 @@
 package orchestrator
 
 type atomicRouteHandler struct {
-	ar *atomicRoute
+	ar *route
 	ck caretaker
 }
 
-func NewRouteHandler(atomicRoute *atomicRoute) *atomicRouteHandler {
+func NewRouteHandler(atomicRoute *route) *atomicRouteHandler {
 	ck, _ := NewFileCareTacker(atomicRoute.id)
 	return &atomicRouteHandler{
 		ar: atomicRoute,

@@ -7,7 +7,7 @@ import (
 )
 
 type fakeSuccessStep struct {
-	TransactionStep
+	TransactionalStep
 }
 
 func (f *fakeSuccessStep) process(ctx *context) error {
@@ -19,7 +19,7 @@ func (f *fakeSuccessStep) failed(ctx context) {
 }
 
 type fakeFailedStep struct {
-	TransactionStep
+	TransactionalStep
 }
 
 func (f *fakeFailedStep) process(ctx *context) error {
@@ -31,7 +31,7 @@ func (f *fakeFailedStep) failed(ctx context) {
 }
 
 func TestAddNextStep(t *testing.T) {
-	r := newRoute("atomicRoute")
+	r := newRoute("route")
 
 	r.addNextStep(&fakeSuccessStep{})
 	r.addNextStep(&fakeSuccessStep{})
