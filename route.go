@@ -8,8 +8,9 @@ import (
 type priority int
 
 const (
-	Condition priority = 2
-	Default   priority = 1
+	Condition     priority = 3
+	ExitCondition priority = 2
+	Default       priority = 1
 )
 
 type (
@@ -17,7 +18,7 @@ type (
 		id             string
 		steps          []TransactionalStep
 		transitions    map[TransactionalStep][]transition
-		conditionStack []TransactionalStep
+		conditionStack transactionalStepStack
 		currentStep    int
 		state          transactionState
 		ctx            *context
@@ -37,7 +38,30 @@ type (
 		Status  transactionStatus
 		State   transactionState
 	}
+
+	transactionalStepStack struct {
+		stack []TransactionalStep
+	}
 )
+
+func (tss *transactionalStepStack) push(step TransactionalStep) {
+	tss.stack = append(tss.stack, step)
+}
+
+func (tss *transactionalStepStack) getLast() TransactionalStep {
+	stackLen := len(tss.stack)
+
+	return tss.stack[stackLen - 1]
+}
+
+func (tss *transactionalStepStack) pop() TransactionalStep {
+	stackLen := len(tss.stack)
+
+	s := tss.stack[stackLen - 1]
+	tss.stack = tss.stack[:stackLen - 1]
+
+	return s
+}
 
 func NewRoute(routeId string) *route {
 	return &route{
@@ -65,43 +89,64 @@ func (r *route) AddNextStep(step TransactionalStep) {
 	}
 }
 
-func (r *route) When(condition func(ctx context) bool, step TransactionalStep) {
+func (r *route) When(condition func(ctx context) bool, step TransactionalStep) *route {
 	r.steps = append(r.steps, step)
 
 	ps := r.steps[len(r.steps)-2]
 	cs := r.steps[len(r.steps)-1]
 
 	// Store conditional transition source for otherwise part
-	r.conditionStack = append(r.conditionStack, ps)
+	r.conditionStack.push(ps)
 
 	r.transitions[ps] = append(r.transitions[ps], transition{
 		to:                   cs,
 		priority:             Condition,
 		shouldTakeTransition: condition,
 	})
+
+	return r
 }
 
-func (r *route) Otherwise(step TransactionalStep) {
+func (r *route) Otherwise(step TransactionalStep) *route {
 	r.steps = append(r.steps, step)
 
-	// Pop last condition transition source
-	s := r.conditionStack[len(r.conditionStack)-1]
-	r.conditionStack = r.conditionStack[:len(r.conditionStack)-1]
+	// Last condition transition source
+	s := r.conditionStack.getLast()
 
-	// Find the condition transition
-	for _, t := range r.transitions[s] {
+	r.transitions[s] = append(r.transitions[s], transition{
+		to:       step,
+		priority: Condition,
+		shouldTakeTransition: func(ctx context) bool {
+			return !r.getCondition(s)(ctx)
+		},
+	})
+
+	return r
+}
+
+// End of condition
+func (r *route) End() *route {
+	s := r.conditionStack.pop()
+
+	r.transitions[s] = append(r.transitions[s], transition{
+		to:       &exitConditionStep{},
+		priority: ExitCondition,
+		shouldTakeTransition: func(ctx context) bool {
+			return true
+		},
+	})
+
+	return r
+}
+
+func (r *route) getCondition(step TransactionalStep) func(ctx context) bool {
+	for _, t := range r.transitions[step] {
 		if t.priority == Condition {
-			r.transitions[s] = append(r.transitions[s], transition{
-				to:       step,
-				priority: Condition,
-				shouldTakeTransition: func(ctx context) bool {
-					return !t.shouldTakeTransition(ctx)
-				},
-			})
-
-			return
+			return t.shouldTakeTransition
 		}
 	}
+
+	return nil
 }
 
 func (r *route) init(ctx context) error {

@@ -20,3 +20,16 @@ type TransactionalStep interface {
 	process(ctx *context) error
 	failed(ctx context)
 }
+
+
+type exitConditionStep struct {
+	TransactionalStep
+}
+
+func (ecs *exitConditionStep) process(ctx *context) error {
+	return nil
+}
+
+func (ecs *exitConditionStep) failed(ctx context) {
+	// empty
+}
