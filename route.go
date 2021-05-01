@@ -22,10 +22,11 @@ type (
 		// route identifier
 		id             string
 
+		// rootStates graph root state
 		rootStates *state
-		lastState *state
 
-		endFlag bool
+		// latest added state
+		lastState *state
 
 		// statemachine ...
 		statemachine *statemachine
@@ -84,18 +85,13 @@ func NewRoute(routeId string) *route {
 
 // AddNextStep TODO: define retry on each state as a transition
 // AddNextStep add new step to route
-func (r *route) AddNextStep(step TransactionalStep) {
+func (r *route) AddNextStep(step TransactionalStep) *route {
 	s := &state{
 		action: r.defineAction(step),
 	}
 
 	if r.rootStates == nil {
 		r.rootStates = s
-	}
-
-	if r.endFlag {
-		r.lastState = r.predicateStack.pop().state
-		r.endFlag = false
 	}
 
 	if r.lastState != nil {
@@ -106,6 +102,7 @@ func (r *route) AddNextStep(step TransactionalStep) {
 
 	// update last state
 	r.lastState = s
+	return r
 }
 
 // When to define a condition
@@ -115,7 +112,7 @@ func (r *route) When(predicate func(ctx context) bool, step TransactionalStep) *
 	}
 
 	r.defineTwoWayTransition(r.lastState, Condition, predicate, s)
-	r.predicateStack.push(predicate, s)
+	r.predicateStack.push(predicate, r.lastState)
 
 	// update last state
 	r.lastState = s
@@ -128,21 +125,30 @@ func (r *route) Otherwise(step TransactionalStep) *route {
 		action: r.defineAction(step),
 	}
 
-	pr := r.predicateStack.getLast().predicate
-	r.defineTwoWayTransition(r.lastState, Condition, func(ctx context) bool {
-		return !pr(ctx)
+	ps := r.predicateStack.getLast()
+	r.defineTwoWayTransition(ps.state, Condition, func(ctx context) bool {
+		return !ps.predicate(ctx)
 	}, s)
 
+	r.lastState = s
 	return r
 }
 
 // End of condition
-func (r *route) End() *route {
-	if r.endFlag {
-		r.predicateStack.pop()
+func (r *route) End(step TransactionalStep) *route {
+	s := &state{
+		action: r.defineAction(step),
 	}
 
-	r.endFlag = true
+	predicate := func(ctx context) bool {
+		return true
+	}
+
+	cs := r.predicateStack.pop().state
+	states := r.getConditionalLastStates(cs)
+	for _, es := range states {
+		r.defineTwoWayTransition(es, Default, predicate, s)
+	}
 
 	return r
 }
@@ -184,4 +190,27 @@ func (r *route) defineTwoWayTransition(src *state, priority int, predicate func 
 			return ctx.getVariable(SMStatusHeaderKey) == SMRollback
 		},
 	})
+}
+
+func (r *route) getConditionalLastStates(root *state) []*state {
+	var result []*state
+	for _, tr := range root.transitions {
+		if tr.priority == Condition {
+			result = append(result, lastState(tr.to))
+		}
+	}
+
+	return result
+}
+
+func lastState(state *state) *state {
+	for _, tr := range state.transitions {
+		ctx,_ := NewContext()
+		ctx.setVariable(SMStatusHeaderKey, "A")
+		if tr.priority == Default && !tr.shouldTakeTransition(*ctx){
+			lastState(tr.to)
+		}
+	}
+
+	return state
 }

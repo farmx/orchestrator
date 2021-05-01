@@ -1,193 +1,124 @@
 package orchestrator
-//
-//import (
-//	"errors"
-//	"github.com/stretchr/testify/assert"
-//	"testing"
-//)
-//
-//type fakeSuccessStep struct {
-//	TransactionalStep
-//}
-//
-//func (f *fakeSuccessStep) doAction(ctx *context) error {
-//	return nil
-//}
-//
-//func (f *fakeSuccessStep) undoAction(ctx context) {
-//
-//}
-//
-//type fakeFailedStep struct {
-//	TransactionalStep
-//}
-//
-//func (f *fakeFailedStep) doAction(ctx *context) error {
-//	return errors.New("fake undoAction")
-//}
-//
-//func (f *fakeFailedStep) undoAction(ctx context) {
-//
-//}
-//
-//func TestAddNextStep(t *testing.T) {
-//	r := newRoute("route")
-//
-//	r.addNextStep(&fakeSuccessStep{})
-//	r.addNextStep(&fakeSuccessStep{})
-//	r.addNextStep(&fakeSuccessStep{})
-//	r.addNextStep(&fakeSuccessStep{})
-//	r.addNextStep(&fakeSuccessStep{})
-//
-//	assert.Equal(t, 5, len(r.steps))
-//}
-//
-//func TestHasNext(t *testing.T) {
-//	scenarios := []struct {
-//		state        transactionState
-//		step         int
-//		numberOfStep int
-//		expected     bool
-//	}{
-//		{
-//			state:        Start,
-//			step:         0,
-//			numberOfStep: 1,
-//			expected:     true,
-//		},
-//		{
-//			state:        Closed,
-//			step:         1,
-//			numberOfStep: 1,
-//			expected:     false,
-//		},
-//		{
-//			state:        InProgress,
-//			step:         1,
-//			numberOfStep: 2,
-//			expected:     true,
-//		},
-//		{
-//			state:        Rollback,
-//			step:         1,
-//			numberOfStep: 2,
-//			expected:     true,
-//		},
-//	}
-//	for _, scenario := range scenarios {
-//
-//		r := newRoute("testRoute")
-//		r.state = scenario.state
-//		r.currentStep = scenario.step
-//		for i := 0; i < scenario.numberOfStep; i++ {
-//			r.addNextStep(&fakeSuccessStep{})
-//		}
-//
-//		assert.Equal(t, scenario.expected, r.hasNext())
-//	}
-//}
-//
-//func TestExecNextStep_rollbackOnProcessFailed(t *testing.T) {
-//	r := newRoute("route_id")
-//	ctx, _ := NewContext(nil)
-//	r.init(*ctx)
-//	r.addNextStep(&fakeSuccessStep{})
-//	r.addNextStep(&fakeFailedStep{})
-//
-//	r.execNextStep()
-//	err := r.execNextStep()
-//
-//	assert.NotNil(t, err)
-//	assert.Equal(t, r.state, Rollback)
-//	assert.Equal(t, r.status, Unknown)
-//}
-//
-//func TestCreateMementoAndRestore_RestoreNewRouteWithAnotherRouteMemento(t *testing.T) {
-//	routeId := "ROUTE_ID"
-//	cStep := 1
-//	state := InProgress
-//	status := Unknown
-//	gid := "11"
-//
-//	r := newRoute(routeId)
-//	r.currentStep = cStep
-//	r.state = state
-//	r.status = status
-//	r.ctx = &context{
-//		gid: gid,
-//	}
-//
-//	mem := r.createMemento()
-//
-//	r2 := newRoute("route_2")
-//	err := r2.restore(mem)
-//
-//	assert.Nil(t, err)
-//	assert.Equal(t, routeId, r.id)
-//	assert.Equal(t, cStep, r.currentStep)
-//	assert.Equal(t, state, r.state)
-//	assert.Equal(t, cStep, r.currentStep)
-//	assert.Equal(t, status, r.status)
-//	assert.Equal(t, gid, r.ctx.gid)
-//}
-//
-//func TestUpdateState_updateRouteStateOnSuccessAndFailedOnly(t *testing.T) {
-//	scenarios := []struct {
-//		numberOfStep int
-//		currentStep  int
-//		expected     struct {
-//			status transactionStatus
-//			state  transactionState
-//		}
-//	}{
-//		{
-//			numberOfStep: 2,
-//			currentStep:  2,
-//			expected: struct {
-//				status transactionStatus
-//				state  transactionState
-//			}{
-//				status: Success,
-//				state:  Closed,
-//			},
-//		},
-//		{
-//			numberOfStep: 2,
-//			currentStep:  -1,
-//			expected: struct {
-//				status transactionStatus
-//				state  transactionState
-//			}{
-//				status: Fail,
-//				state:  Closed,
-//			},
-//		},
-//		{
-//			numberOfStep: 2,
-//			currentStep:  1,
-//			expected: struct {
-//				status transactionStatus
-//				state  transactionState
-//			}{
-//				status: Unknown,
-//				state:  InProgress,
-//			},
-//		},
-//	}
-//
-//	for _, scenario := range scenarios {
-//
-//		r := newRoute("testRoute")
-//		r.state = InProgress
-//		r.status = Unknown
-//		r.currentStep = scenario.currentStep
-//		for i := 0; i < scenario.numberOfStep; i++ {
-//			r.addNextStep(&fakeSuccessStep{})
-//		}
-//
-//		r.updateState()
-//
-//		assert.Equal(t, scenario.expected.status, r.status)
-//		assert.Equal(t, scenario.expected.state, r.state)
-//	}
-//}
+
+import (
+	"github.com/stretchr/testify/assert"
+	"log"
+	"testing"
+)
+
+type alwaysPassTransactionMock struct {
+	TransactionalStep
+}
+
+func (aptm *alwaysPassTransactionMock) DoAction(ctx *context) error {
+	if ctx.getVariable("HK") == nil {
+		ctx.setVariable("HK", 0)
+	}
+
+	ctx.setVariable("HK", ctx.getVariable("HK").(int) + 1)
+
+	log.Print("do action")
+	return nil
+}
+
+func (aptm *alwaysPassTransactionMock) UndoAction(ctx context) {
+
+}
+
+func TestDefineUnconditionalRoute(t *testing.T) {
+	r := NewRoute("sample").
+		AddNextStep(&alwaysPassTransactionMock{}).
+		AddNextStep(&alwaysPassTransactionMock{}).
+		AddNextStep(&alwaysPassTransactionMock{})
+
+	ctx, _ := NewContext()
+	r.Exec(*ctx)
+
+	assert.Equal(t, 3, r.statemachine.context.getVariable("HK"))
+}
+
+func TestDefineConditionalRoute(t *testing.T) {
+	r := NewRoute("sample").
+		AddNextStep(&alwaysPassTransactionMock{}).
+		AddNextStep(&alwaysPassTransactionMock{}).
+		When(func(ctx context) bool {return true},
+			&alwaysPassTransactionMock{}).
+			AddNextStep(&alwaysPassTransactionMock{}).
+			AddNextStep(&alwaysPassTransactionMock{})
+
+	ctx, _ := NewContext()
+	r.Exec(*ctx)
+
+	assert.Equal(t, 3, r.statemachine.context.getVariable("HK"))
+}
+
+func TestDefineNestedConditionalRoute(t *testing.T) {
+	r := NewRoute("sample").
+		AddNextStep(&alwaysPassTransactionMock{}).
+		AddNextStep(&alwaysPassTransactionMock{}).
+		When(func(ctx context) bool {return true},
+			&alwaysPassTransactionMock{}).
+			When(func(ctx context) bool {return true},
+				&alwaysPassTransactionMock{}).
+				AddNextStep(&alwaysPassTransactionMock{}).
+				AddNextStep(&alwaysPassTransactionMock{})
+
+	ctx, _ := NewContext()
+	r.Exec(*ctx)
+
+	assert.Equal(t, 6, r.statemachine.context.getVariable("HK"))
+}
+
+func TestDefineConditionWithOtherwiseRoute(t *testing.T) {
+	r := NewRoute("sample").
+		AddNextStep(&alwaysPassTransactionMock{}).
+		AddNextStep(&alwaysPassTransactionMock{}).
+		When(func(ctx context) bool {return true},
+			&alwaysPassTransactionMock{}).
+			AddNextStep(&alwaysPassTransactionMock{}).
+		Otherwise(&alwaysPassTransactionMock{}).
+			AddNextStep(&alwaysPassTransactionMock{}).
+			AddNextStep(&alwaysPassTransactionMock{})
+
+	ctx, _ := NewContext()
+	r.Exec(*ctx)
+
+	assert.Equal(t, 4, r.statemachine.context.getVariable("HK"))
+}
+
+func TestDefineConditionWithOtherwiseAndEndRoute(t *testing.T) {
+	r := NewRoute("sample").
+		AddNextStep(&alwaysPassTransactionMock{}).
+		AddNextStep(&alwaysPassTransactionMock{}).
+		When(func(ctx context) bool {return false},
+			&alwaysPassTransactionMock{}).
+		Otherwise(&alwaysPassTransactionMock{}).
+			AddNextStep(&alwaysPassTransactionMock{}).
+			AddNextStep(&alwaysPassTransactionMock{})
+
+	ctx, _ := NewContext()
+	r.Exec(*ctx)
+
+	assert.Equal(t, 5, r.statemachine.context.getVariable("HK"))
+}
+
+func TestDefineRoute(t *testing.T) {
+	r := NewRoute("sample").
+		AddNextStep(&alwaysPassTransactionMock{}).
+		AddNextStep(&alwaysPassTransactionMock{}).
+		When(func(ctx context) bool {return true},
+			&alwaysPassTransactionMock{}).
+			AddNextStep(&alwaysPassTransactionMock{}).
+			AddNextStep(&alwaysPassTransactionMock{}).
+			AddNextStep(&alwaysPassTransactionMock{}).
+		Otherwise(&alwaysPassTransactionMock{}).
+			AddNextStep(&alwaysPassTransactionMock{}).
+			AddNextStep(&alwaysPassTransactionMock{}).
+			AddNextStep(&alwaysPassTransactionMock{}).
+		End(&alwaysPassTransactionMock{})
+
+	ctx, _ := NewContext()
+	r.Exec(*ctx)
+
+	assert.Equal(t, 7, r.statemachine.context.getVariable("HK"))
+}
