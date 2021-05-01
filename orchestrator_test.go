@@ -6,13 +6,13 @@ type passStep struct {
 	TransactionalStep
 }
 
-func (ps *passStep) process(ctx *context) error {
-	println("process")
+func (ps *passStep) doAction(ctx *context) error {
+	println("doAction")
 	return nil
 }
 
-func (ps *passStep) failed(ctx context) {
-	println("failed")
+func (ps *passStep) undoAction(ctx context) {
+	println("undoAction")
 }
 
 func TestSample(t *testing.T) {

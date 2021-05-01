@@ -1,60 +1,71 @@
 package orchestrator
 
-import (
-	"encoding/json"
-	"errors"
-)
 
-type priority int
+type TransactionalStep interface {
+	DoAction(ctx *context) error
+	UndoAction(ctx context)
+}
+
+type transactionStatus string
 
 const (
-	Condition     priority = 3
-	ExitCondition priority = 2
-	Default       priority = 1
+	Condition     int = 2
+	Default       int = 1
+
+	Started transactionStatus = "STARTED"
+	Success transactionStatus = "SUCCESS"
+	Fail    transactionStatus = "FAIL"
 )
 
 type (
 	route struct {
+		// route identifier
 		id             string
-		steps          []TransactionalStep
-		transitions    map[TransactionalStep][]transition
-		conditionStack transactionalStepStack
-		currentStep    int
-		state          transactionState
-		ctx            *context
+
+		rootStates *state
+		lastState *state
+
+		endFlag bool
+
+		// statemachine ...
+		statemachine *statemachine
+
+		// conditionStateStack keep condition steps for otherwise/end-condition purpose
+		predicateStack stateStack
+
+		// transaction status
 		status         transactionStatus
+
 	}
 
-	transition struct {
-		to                   TransactionalStep
-		priority             priority
-		shouldTakeTransition func(ctx context) bool
+	stateStack struct {
+		stack []predicateState
 	}
 
-	routeSnapshot struct {
-		RouteId string
-		Context context
-		Step    int
-		Status  transactionStatus
-		State   transactionState
-	}
-
-	transactionalStepStack struct {
-		stack []TransactionalStep
+	predicateState struct {
+		predicate func (context) bool
+		state *state
 	}
 )
 
-func (tss *transactionalStepStack) push(step TransactionalStep) {
-	tss.stack = append(tss.stack, step)
+func (tss *stateStack) isEmpty() bool {
+	return len(tss.stack) < 1
 }
 
-func (tss *transactionalStepStack) getLast() TransactionalStep {
+func (tss *stateStack) push(predicate func (context) bool, state *state) {
+	tss.stack = append(tss.stack, predicateState{
+		predicate: predicate,
+		state: state,
+	})
+}
+
+func (tss *stateStack) getLast() predicateState {
 	stackLen := len(tss.stack)
 
 	return tss.stack[stackLen - 1]
 }
 
-func (tss *transactionalStepStack) pop() TransactionalStep {
+func (tss *stateStack) pop() predicateState {
 	stackLen := len(tss.stack)
 
 	s := tss.stack[stackLen - 1]
@@ -63,202 +74,114 @@ func (tss *transactionalStepStack) pop() TransactionalStep {
 	return s
 }
 
+// NewRoute define and return a route
 func NewRoute(routeId string) *route {
 	return &route{
 		id:          routeId,
-		steps:       []TransactionalStep{},
-		transitions: make(map[TransactionalStep][]transition),
-		currentStep: 0,
+		statemachine: &statemachine{},
 	}
 }
 
+// AddNextStep TODO: define retry on each state as a transition
+// AddNextStep add new step to route
 func (r *route) AddNextStep(step TransactionalStep) {
-	r.steps = append(r.steps, step)
-
-	if len(r.steps) > 1 {
-		ps := r.steps[len(r.steps)-2]
-		cs := r.steps[len(r.steps)-1]
-
-		r.transitions[ps] = append(r.transitions[ps], transition{
-			to:       cs,
-			priority: Default,
-			shouldTakeTransition: func(ctx context) bool {
-				return true
-			},
-		})
+	s := &state{
+		action: r.defineAction(step),
 	}
+
+	if r.rootStates == nil {
+		r.rootStates = s
+	}
+
+	if r.endFlag {
+		r.lastState = r.predicateStack.pop().state
+		r.endFlag = false
+	}
+
+	if r.lastState != nil {
+		r.defineTwoWayTransition(r.lastState, Default, func(ctx context) bool {
+			return ctx.getVariable(SMStatusHeaderKey) != SMRollback
+		}, s)
+	}
+
+	// update last state
+	r.lastState = s
 }
 
-func (r *route) When(condition func(ctx context) bool, step TransactionalStep) *route {
-	r.steps = append(r.steps, step)
+// When to define a condition
+func (r *route) When(predicate func(ctx context) bool, step TransactionalStep) *route {
+	s := &state{
+		action: r.defineAction(step),
+	}
 
-	ps := r.steps[len(r.steps)-2]
-	cs := r.steps[len(r.steps)-1]
+	r.defineTwoWayTransition(r.lastState, Condition, predicate, s)
+	r.predicateStack.push(predicate, s)
 
-	// Store conditional transition source for otherwise part
-	r.conditionStack.push(ps)
-
-	r.transitions[ps] = append(r.transitions[ps], transition{
-		to:                   cs,
-		priority:             Condition,
-		shouldTakeTransition: condition,
-	})
-
+	// update last state
+	r.lastState = s
 	return r
 }
 
+// Otherwise when condition
 func (r *route) Otherwise(step TransactionalStep) *route {
-	r.steps = append(r.steps, step)
+	s := &state{
+		action: r.defineAction(step),
+	}
 
-	// Last condition transition source
-	s := r.conditionStack.getLast()
-
-	r.transitions[s] = append(r.transitions[s], transition{
-		to:       step,
-		priority: Condition,
-		shouldTakeTransition: func(ctx context) bool {
-			return !r.getCondition(s)(ctx)
-		},
-	})
+	pr := r.predicateStack.getLast().predicate
+	r.defineTwoWayTransition(r.lastState, Condition, func(ctx context) bool {
+		return !pr(ctx)
+	}, s)
 
 	return r
 }
 
 // End of condition
 func (r *route) End() *route {
-	s := r.conditionStack.pop()
+	if r.endFlag {
+		r.predicateStack.pop()
+	}
 
-	r.transitions[s] = append(r.transitions[s], transition{
-		to:       &exitConditionStep{},
-		priority: ExitCondition,
-		shouldTakeTransition: func(ctx context) bool {
-			return true
-		},
-	})
+	r.endFlag = true
 
 	return r
 }
 
-func (r *route) getCondition(step TransactionalStep) func(ctx context) bool {
-	for _, t := range r.transitions[step] {
-		if t.priority == Condition {
-			return t.shouldTakeTransition
+
+func (r *route) Exec(ctx context) {
+	r.status = Started
+	r.statemachine.init(r.rootStates, ctx)
+
+	for r.statemachine.hastNext() {
+		_ = r.statemachine.next()
+	}
+}
+
+func (r *route) defineAction(step TransactionalStep) func(ctx *context) error {
+	return func(ctx *context) error {
+		if ctx.getVariable(SMStatusHeaderKey) == SMRollback {
+			step.UndoAction(*ctx)
+			return nil
 		}
-	}
 
-	return nil
-}
-
-func (r *route) init(ctx context) error {
-	if r.state == InProgress || r.state == Rollback {
-		return errors.New("route in progress. can not change the context")
-	}
-
-	r.status = Unknown
-	r.state = Start
-	r.ctx = &ctx
-
-	return nil
-}
-
-func (r *route) hasNext() bool {
-	if r.state == Closed {
-		return false
-	}
-
-	if r.state == Start {
-		return true
-	}
-
-	processNotFinished := r.state == InProgress && r.currentStep < len(r.steps)
-	rollbackNotFinished := r.state == Rollback && r.currentStep >= 0
-
-	return processNotFinished || rollbackNotFinished
-}
-
-func (r *route) execNextStep() (err error) {
-	switch r.state {
-	case Start, InProgress:
-		if err = r.process(); err != nil {
-			r.state = Rollback
-			// On process failed, the previous step failed method must be called
-			r.currentStep--
-		}
-	case Rollback:
-		r.rollback()
-	}
-
-	r.updateState()
-	return err
-}
-
-func (r *route) updateState() {
-	if r.currentStep == len(r.steps) {
-		r.status = Success
-		r.state = Closed
-	}
-
-	if r.currentStep < 0 {
-		r.status = Fail
-		r.state = Closed
+		return step.DoAction(ctx)
 	}
 }
 
-func (r *route) process() error {
-	r.state = InProgress
+func (r *route) defineTwoWayTransition(src *state, priority int, predicate func (context) bool, dst *state) {
+	// make a transition form prev state to last state
+	src.transitions = append(src.transitions, transition{
+		to: dst,
+		priority: priority,
+		shouldTakeTransition: predicate,
+	})
 
-	if err := r.steps[r.currentStep].process(r.ctx); err != nil {
-		return err
-	}
-
-	r.currentStep++
-	return nil
-}
-
-func (r *route) rollback() {
-	r.state = Rollback
-
-	if r.currentStep >= 0 {
-		r.steps[r.currentStep].failed(*r.ctx)
-		r.currentStep--
-	}
-}
-
-func (r *route) createMemento() string {
-	memento := &routeSnapshot{
-		RouteId: r.id,
-		Step:    r.currentStep,
-		State:   r.state,
-		Status:  r.status,
-		Context: *r.ctx,
-	}
-
-	data, _ := json.Marshal(memento)
-	return string(data)
-}
-
-func (r *route) restore(memento string) error {
-	var mem routeSnapshot
-	if err := json.Unmarshal([]byte(memento), &mem); err != nil {
-		return err
-	}
-
-	if mem.RouteId == "" {
-		return errors.New("RouteId is empty")
-	}
-
-	if mem.Step < 0 {
-		return errors.New("negative value does not allow for Step")
-	}
-
-	if mem.State != Start && mem.State != Closed && mem.State != InProgress && mem.State != Rollback {
-		return errors.New("invalid route State")
-	}
-
-	r.id = mem.RouteId
-	r.currentStep = mem.Step
-	r.state = mem.State
-	r.status = mem.Status
-
-	return nil
+	// make a transition from last to prev state on rollback
+	dst.transitions = append(dst.transitions, transition{
+		to: src,
+		priority: Default,
+		shouldTakeTransition: func(ctx context) bool {
+			return ctx.getVariable(SMStatusHeaderKey) == SMRollback
+		},
+	})
 }

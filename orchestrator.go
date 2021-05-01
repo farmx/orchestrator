@@ -1,10 +1,10 @@
 package orchestrator
 
-//  TODO: Inject chain failed strategy in each atomic route handler
+//  TODO: Inject chain undoAction strategy in each atomic route handler
 
 // Every route is created from multiple state those are connected with and edge
 // Each edge has a priority and a condition
-// To go to the next step the edge sorted by priority and the first one which comply the condition, the process continued then
+// To go to the next step the edge sorted by priority and the first one which comply the condition, the doAction continued then
 // In this scenario retry and backoff algorithm can be define as a edge which it's priority will be decrease with each time execution
 // Orchestrator handover context between registered route based on their identifier
 type orchestrator struct {
