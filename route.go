@@ -111,8 +111,8 @@ func (r *route) When(predicate func(ctx context) bool, step TransactionalStep) *
 		action: r.defineAction(step),
 	}
 
-	r.defineTwoWayTransition(r.lastState, Condition, predicate, s)
 	r.predicateStack.push(predicate, r.lastState)
+	r.defineTwoWayTransition(r.lastState, Condition, predicate, s)
 
 	// update last state
 	r.lastState = s
@@ -134,6 +134,13 @@ func (r *route) Otherwise(step TransactionalStep) *route {
 	return r
 }
 
+//        condition
+//       /    |    \
+//     not   no    yes
+//  included  |     |
+//       \    |    /
+//        end state
+
 // End of condition
 func (r *route) End(step TransactionalStep) *route {
 	s := &state{
@@ -145,11 +152,17 @@ func (r *route) End(step TransactionalStep) *route {
 	}
 
 	cs := r.predicateStack.pop().state
+
+	// define transition from last state of each condition state
 	states := r.getConditionalLastStates(cs)
 	for _, es := range states {
 		r.defineTwoWayTransition(es, Default, predicate, s)
 	}
 
+	// define a transition from root condition state
+	r.defineTwoWayTransition(cs, Default, predicate, s)
+
+	r.lastState = s
 	return r
 }
 
@@ -175,14 +188,14 @@ func (r *route) defineAction(step TransactionalStep) func(ctx *context) error {
 }
 
 func (r *route) defineTwoWayTransition(src *state, priority int, predicate func (context) bool, dst *state) {
-	// make a transition form prev state to last state
+	// define a transition form src state to dst state
 	src.transitions = append(src.transitions, transition{
 		to: dst,
 		priority: priority,
 		shouldTakeTransition: predicate,
 	})
 
-	// make a transition from last to prev state on rollback
+	// define a transition from dst to src state for rollback
 	dst.transitions = append(dst.transitions, transition{
 		to: src,
 		priority: Default,
@@ -206,9 +219,9 @@ func (r *route) getConditionalLastStates(root *state) []*state {
 func lastState(state *state) *state {
 	for _, tr := range state.transitions {
 		ctx,_ := NewContext()
-		ctx.setVariable(SMStatusHeaderKey, "A")
+		ctx.setVariable(SMStatusHeaderKey, SMRollback)
 		if tr.priority == Default && !tr.shouldTakeTransition(*ctx){
-			lastState(tr.to)
+			return lastState(tr.to)
 		}
 	}
 

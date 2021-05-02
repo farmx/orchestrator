@@ -49,7 +49,20 @@ func TestDefineConditionalRoute(t *testing.T) {
 	ctx, _ := NewContext()
 	r.Exec(*ctx)
 
-	assert.Equal(t, 3, r.statemachine.context.getVariable("HK"))
+	assert.Equal(t, 5, r.statemachine.context.getVariable("HK"))
+
+	rf := NewRoute("sample_f").
+		AddNextStep(&alwaysPassTransactionMock{}).
+		AddNextStep(&alwaysPassTransactionMock{}).
+		When(func(ctx context) bool {return false},
+			&alwaysPassTransactionMock{}).
+		AddNextStep(&alwaysPassTransactionMock{}).
+		AddNextStep(&alwaysPassTransactionMock{})
+
+	ctxf, _ := NewContext()
+	rf.Exec(*ctxf)
+
+	assert.Equal(t, 2, rf.statemachine.context.getVariable("HK"))
 }
 
 func TestDefineNestedConditionalRoute(t *testing.T) {
@@ -105,20 +118,14 @@ func TestDefineConditionWithOtherwiseAndEndRoute(t *testing.T) {
 func TestDefineRoute(t *testing.T) {
 	r := NewRoute("sample").
 		AddNextStep(&alwaysPassTransactionMock{}).
-		AddNextStep(&alwaysPassTransactionMock{}).
 		When(func(ctx context) bool {return true},
 			&alwaysPassTransactionMock{}).
 			AddNextStep(&alwaysPassTransactionMock{}).
-			AddNextStep(&alwaysPassTransactionMock{}).
-			AddNextStep(&alwaysPassTransactionMock{}).
 		Otherwise(&alwaysPassTransactionMock{}).
-			AddNextStep(&alwaysPassTransactionMock{}).
-			AddNextStep(&alwaysPassTransactionMock{}).
-			AddNextStep(&alwaysPassTransactionMock{}).
 		End(&alwaysPassTransactionMock{})
 
 	ctx, _ := NewContext()
 	r.Exec(*ctx)
 
-	assert.Equal(t, 7, r.statemachine.context.getVariable("HK"))
+	assert.Equal(t, 4, r.statemachine.context.getVariable("HK"))
 }
