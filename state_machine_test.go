@@ -184,3 +184,101 @@ func TestLoop(t *testing.T) {
 	assert.Equal(t, SMEnd, sm.context.getVariable(SMStatusHeaderKey))
 
 }
+
+func TestComplexCondition(t *testing.T) {
+	state1 := &state{
+		name: "state_1",
+		action: func(ctx *context) error {
+			log.Print("state 1 action")
+			return nil
+		},
+	}
+
+	state2 := &state{
+		name: "state_2",
+		action: func(ctx *context) error {
+			log.Print("state 2 action")
+			return nil
+		},
+	}
+
+	state3 := &state{
+		name: "state_3",
+		action: func(ctx *context) error {
+			log.Print("state 3 action")
+			return nil
+		},
+	}
+
+	state4 := &state{
+		name: "state_4",
+		action: func(ctx *context) error {
+			log.Print("state 4 action")
+			return nil
+		},
+	}
+
+	state5 := &state{
+		name: "state_5",
+		action: func(ctx *context) error {
+			log.Print("state 5 action")
+			return nil
+		},
+	}
+
+	state1.transitions = append(state1.transitions, transition{
+		to: state2,
+		priority: 2,
+		shouldTakeTransition: func(ctx context) bool {
+			return true
+		},
+	})
+
+	state1.transitions = append(state1.transitions, transition{
+		to: state3,
+		priority: 2,
+		shouldTakeTransition: func(ctx context) bool {
+			return false
+		},
+	})
+
+	state2.transitions = append(state2.transitions, transition{
+		to: state4,
+		priority: 1,
+		shouldTakeTransition: func(ctx context) bool {
+			return true
+		},
+	})
+
+	state4.transitions = append(state4.transitions, transition{
+		to: state5,
+		priority: 1,
+		shouldTakeTransition: func(ctx context) bool {
+			return true
+		},
+	})
+
+	state3.transitions = append(state3.transitions, transition{
+		to: state5,
+		priority: 1,
+		shouldTakeTransition: func(ctx context) bool {
+			return true
+		},
+	})
+
+	state1.transitions = append(state1.transitions, transition{
+		to: state5,
+		priority: 1,
+		shouldTakeTransition: func(ctx context) bool {
+			return true
+		},
+	})
+
+	ctx, _ := NewContext()
+	sm := &statemachine{}
+	sm.init(state1, *ctx)
+
+	for sm.hastNext() {
+		_ = sm.next()
+	}
+}

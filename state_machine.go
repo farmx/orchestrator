@@ -55,7 +55,7 @@ func (sm *statemachine) next() (err error) {
 
 	// sort based on priority
 	sort.Slice(sm.currentState.transitions[:], func(i, j int) bool {
-		return sm.currentState.transitions[i].priority <= sm.currentState.transitions[j].priority
+		return sm.currentState.transitions[i].priority >= sm.currentState.transitions[j].priority
 	})
 
 	for _, ts := range sm.currentState.transitions {
