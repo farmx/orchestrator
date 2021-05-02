@@ -154,13 +154,16 @@ func (r *route) End(step TransactionalStep) *route {
 	cs := r.predicateStack.pop().state
 
 	// define transition from last state of each condition state
-	states := r.getConditionalLastStates(cs)
-	for _, es := range states {
+	cls := r.getConditionalLastStates(cs)
+	for _, es := range cls {
 		r.defineTwoWayTransition(es, Default, predicate, s)
 	}
 
-	// define a transition from root condition state
-	r.defineTwoWayTransition(cs, Default, predicate, s)
+	// otherwise doesn't define
+	if len(cls) < 2 {
+		// define a transition from root condition state
+		r.defineTwoWayTransition(cs, Default, predicate, s)
+	}
 
 	r.lastState = s
 	return r
