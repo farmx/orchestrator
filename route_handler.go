@@ -6,8 +6,8 @@ type transactionStatus string
 
 const (
 	InProgress transactionStatus = "IN_PROGRESS"
-	Success transactionStatus = "SUCCESS"
-	Fail    transactionStatus = "FAIL"
+	Success    transactionStatus = "SUCCESS"
+	Fail       transactionStatus = "FAIL"
 )
 
 type routeHandler struct {
@@ -30,10 +30,10 @@ type routeHandler struct {
 // route is root state
 func newRouteHandler(id string, routeRootState *state, recoveryRootState *state) *routeHandler {
 	return &routeHandler{
-		id: id,
-		routeRootState: routeRootState,
+		id:                id,
+		routeRootState:    routeRootState,
 		recoveryRootState: recoveryRootState,
-		statemachine: &statemachine{},
+		statemachine:      &statemachine{},
 	}
 }
 

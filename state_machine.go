@@ -15,16 +15,15 @@ const (
 )
 
 type (
-
 	statemachine struct {
 		currentState *state
-		context *context
+		context      *context
 	}
 
 	state struct {
-		name string
+		name        string
 		transitions []transition
-		action func(ctx *context) error
+		action      func(ctx *context) error
 	}
 
 	transition struct {
@@ -32,7 +31,6 @@ type (
 		priority             int
 		shouldTakeTransition func(ctx context) bool
 	}
-
 )
 
 func (sm *statemachine) init(currentState *state, ctx context) {

@@ -1,14 +1,13 @@
 package orchestrator
 
-
 type TransactionalStep interface {
 	DoAction(ctx *context) error
 	UndoAction(ctx context)
 }
 
 const (
-	Condition     int = 2
-	Default       int = 1
+	Condition int = 2
+	Default   int = 1
 )
 
 type (
@@ -25,7 +24,6 @@ type (
 
 		// naming the state
 		counter *counter
-
 	}
 
 	stateStack struct {
@@ -33,8 +31,8 @@ type (
 	}
 
 	predicateState struct {
-		predicate func (context) bool
-		state *state
+		predicate func(context) bool
+		state     *state
 	}
 )
 
@@ -42,24 +40,24 @@ func (tss *stateStack) isEmpty() bool {
 	return len(tss.stack) < 1
 }
 
-func (tss *stateStack) push(predicate func (context) bool, state *state) {
+func (tss *stateStack) push(predicate func(context) bool, state *state) {
 	tss.stack = append(tss.stack, predicateState{
 		predicate: predicate,
-		state: state,
+		state:     state,
 	})
 }
 
 func (tss *stateStack) getLast() predicateState {
 	stackLen := len(tss.stack)
 
-	return tss.stack[stackLen - 1]
+	return tss.stack[stackLen-1]
 }
 
 func (tss *stateStack) pop() predicateState {
 	stackLen := len(tss.stack)
 
-	s := tss.stack[stackLen - 1]
-	tss.stack = tss.stack[:stackLen - 1]
+	s := tss.stack[stackLen-1]
+	tss.stack = tss.stack[:stackLen-1]
 
 	return s
 }
@@ -74,7 +72,7 @@ func newRoute() *route {
 // addNextStep add new step to route
 func (r *route) addNextStep(step TransactionalStep) *route {
 	s := &state{
-		name: "state_" + r.counter.next(),
+		name:   "state_" + r.counter.next(),
 		action: r.defineAction(step),
 	}
 
@@ -96,7 +94,7 @@ func (r *route) addNextStep(step TransactionalStep) *route {
 // when to define a condition
 func (r *route) when(predicate func(ctx context) bool, step TransactionalStep) *route {
 	s := &state{
-		name: "state_" + r.counter.subCount(),
+		name:   "state_" + r.counter.subCount(),
 		action: r.defineAction(step),
 	}
 
@@ -112,7 +110,7 @@ func (r *route) when(predicate func(ctx context) bool, step TransactionalStep) *
 func (r *route) otherwise(step TransactionalStep) *route {
 	r.counter.endSubCounting()
 	s := &state{
-		name: "state_ot_" + r.counter.subCount(),
+		name:   "state_ot_" + r.counter.subCount(),
 		action: r.defineAction(step),
 	}
 
@@ -137,7 +135,7 @@ func (r *route) end(step TransactionalStep) *route {
 	r.counter.endSubCounting()
 
 	s := &state{
-		name: "state_" + r.counter.next(),
+		name:   "state_" + r.counter.next(),
 		action: r.defineAction(step),
 	}
 
@@ -178,17 +176,17 @@ func (r *route) defineAction(step TransactionalStep) func(ctx *context) error {
 	}
 }
 
-func (r *route) defineTwoWayTransition(src *state, priority int, predicate func (context) bool, dst *state) {
+func (r *route) defineTwoWayTransition(src *state, priority int, predicate func(context) bool, dst *state) {
 	// define a transition form src state to dst state
 	src.transitions = append(src.transitions, transition{
-		to: dst,
-		priority: priority,
+		to:                   dst,
+		priority:             priority,
 		shouldTakeTransition: predicate,
 	})
 
 	// define a transition from dst to src state for rollback
 	dst.transitions = append(dst.transitions, transition{
-		to: src,
+		to:       src,
 		priority: Default,
 		shouldTakeTransition: func(ctx context) bool {
 			return ctx.getVariable(SMStatusHeaderKey) == SMRollback
@@ -209,9 +207,9 @@ func (r *route) getConditionalLastStates(root *state) []*state {
 
 func lastState(state *state) *state {
 	for _, tr := range state.transitions {
-		ctx,_ := NewContext()
+		ctx, _ := NewContext()
 		ctx.setVariable(SMStatusHeaderKey, SMRollback)
-		if tr.priority == Default && !tr.shouldTakeTransition(*ctx){
+		if tr.priority == Default && !tr.shouldTakeTransition(*ctx) {
 			return lastState(tr.to)
 		}
 	}

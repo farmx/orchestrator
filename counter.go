@@ -34,5 +34,5 @@ func (c *counter) subCount() string {
 
 func (c *counter) endSubCounting() {
 	lenv := len(c.versions)
-	c.versions = c.versions[:lenv - 1]
+	c.versions = c.versions[:lenv-1]
 }

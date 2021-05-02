@@ -14,7 +14,7 @@ func (aptm *alwaysPassTransactionMock) DoAction(ctx *context) error {
 		ctx.setVariable("HK", 0)
 	}
 
-	ctx.setVariable("HK", ctx.getVariable("HK").(int) + 1)
+	ctx.setVariable("HK", ctx.getVariable("HK").(int)+1)
 	return nil
 }
 
@@ -45,7 +45,7 @@ func TestDefineConditionalRoute(t *testing.T) {
 	r := newRoute().
 		addNextStep(&alwaysPassTransactionMock{}).
 		addNextStep(&alwaysPassTransactionMock{}).
-		when(func(ctx context) bool {return true},
+		when(func(ctx context) bool { return true },
 			&alwaysPassTransactionMock{}).
 		addNextStep(&alwaysPassTransactionMock{}).
 		addNextStep(&alwaysPassTransactionMock{})
@@ -57,7 +57,7 @@ func TestDefineConditionalRoute(t *testing.T) {
 	rf := newRoute().
 		addNextStep(&alwaysPassTransactionMock{}).
 		addNextStep(&alwaysPassTransactionMock{}).
-		when(func(ctx context) bool {return false},
+		when(func(ctx context) bool { return false },
 			&alwaysPassTransactionMock{}).
 		addNextStep(&alwaysPassTransactionMock{}).
 		addNextStep(&alwaysPassTransactionMock{})
@@ -71,10 +71,10 @@ func TestDefineNestedConditionalRoute(t *testing.T) {
 	r := newRoute().
 		addNextStep(&alwaysPassTransactionMock{}).
 		addNextStep(&alwaysPassTransactionMock{}).
-		when(func(ctx context) bool {return true},
+		when(func(ctx context) bool { return true },
 			&alwaysPassTransactionMock{}).
-		when(func(ctx context) bool {return true},
-				&alwaysPassTransactionMock{}).
+		when(func(ctx context) bool { return true },
+			&alwaysPassTransactionMock{}).
 		addNextStep(&alwaysPassTransactionMock{}).
 		addNextStep(&alwaysPassTransactionMock{})
 
@@ -87,7 +87,7 @@ func TestDefineConditionWithOtherwiseRoute(t *testing.T) {
 	r := newRoute().
 		addNextStep(&alwaysPassTransactionMock{}).
 		addNextStep(&alwaysPassTransactionMock{}).
-		when(func(ctx context) bool {return true},
+		when(func(ctx context) bool { return true },
 			&alwaysPassTransactionMock{}).
 		addNextStep(&alwaysPassTransactionMock{}).
 		otherwise(&alwaysPassTransactionMock{}).
@@ -103,7 +103,7 @@ func TestDefineConditionWithOtherwiseAndEndRoute(t *testing.T) {
 	r := newRoute().
 		addNextStep(&alwaysPassTransactionMock{}).
 		addNextStep(&alwaysPassTransactionMock{}).
-		when(func(ctx context) bool {return false},
+		when(func(ctx context) bool { return false },
 			&alwaysPassTransactionMock{}).
 		otherwise(&alwaysPassTransactionMock{}).
 		addNextStep(&alwaysPassTransactionMock{}).
@@ -117,7 +117,7 @@ func TestDefineConditionWithOtherwiseAndEndRoute(t *testing.T) {
 func TestDefineRoute(t *testing.T) {
 	r := newRoute().
 		addNextStep(&alwaysPassTransactionMock{}).
-		when(func(ctx context) bool {return true},
+		when(func(ctx context) bool { return true },
 			&alwaysPassTransactionMock{}).
 		addNextStep(&alwaysPassTransactionMock{}).
 		otherwise(&alwaysPassTransactionMock{}).

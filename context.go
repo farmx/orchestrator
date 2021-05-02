@@ -8,10 +8,10 @@ import (
 )
 
 type context struct {
-	gid    string
-	lock sync.Mutex
-	constant map[string]interface{}
-	variables   map[string]interface{}
+	gid       string
+	lock      sync.Mutex
+	constant  map[string]interface{}
+	variables map[string]interface{}
 }
 
 func NewContext() (*context, error) {
@@ -26,9 +26,9 @@ func NewContextWithGid(gid string) (*context, error) {
 	}
 
 	return &context{
-		gid:  gid,
-		lock: sync.Mutex{},
-		constant: make(map[string]interface{}),
+		gid:       gid,
+		lock:      sync.Mutex{},
+		constant:  make(map[string]interface{}),
 		variables: make(map[string]interface{}),
 	}, nil
 }
@@ -48,7 +48,7 @@ func (ctx *context) setConstant(key string, value interface{}) error {
 	return nil
 }
 
-func (ctx *context) setVariable(key string, value interface{}){
+func (ctx *context) setVariable(key string, value interface{}) {
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
 

@@ -23,7 +23,7 @@ func TestHappyScenario(t *testing.T) {
 	}
 
 	state1.transitions = append(state1.transitions, transition{
-		to: state2,
+		to:       state2,
 		priority: 1,
 		shouldTakeTransition: func(ctx context) bool {
 			return true
@@ -73,7 +73,7 @@ func TestRollback(t *testing.T) {
 	}
 
 	state1.transitions = append(state1.transitions, transition{
-		to: state2,
+		to:       state2,
 		priority: 1,
 		shouldTakeTransition: func(ctx context) bool {
 			return ctx.getVariable(SMStatusHeaderKey) != SMRollback
@@ -81,7 +81,7 @@ func TestRollback(t *testing.T) {
 	})
 
 	state2.transitions = append(state2.transitions, transition{
-		to: state1,
+		to:       state1,
 		priority: 1,
 		shouldTakeTransition: func(ctx context) bool {
 			return ctx.getVariable(SMStatusHeaderKey) == SMRollback
@@ -91,7 +91,6 @@ func TestRollback(t *testing.T) {
 	ctx, _ := NewContext()
 	sm := &statemachine{}
 	sm.init(state1, *ctx)
-
 
 	// init time
 	assert.Equal(t, true, sm.hastNext())
@@ -126,7 +125,7 @@ func TestLoop(t *testing.T) {
 				ctx.setVariable(headerKey, 0)
 			}
 
-			ctx.setVariable(headerKey, ctx.getVariable(headerKey).(int) + 1)
+			ctx.setVariable(headerKey, ctx.getVariable(headerKey).(int)+1)
 			log.Print("state 1 action")
 			return nil
 		},
@@ -140,7 +139,7 @@ func TestLoop(t *testing.T) {
 	}
 
 	state1.transitions = append(state1.transitions, transition{
-		to: state2,
+		to:       state2,
 		priority: 1,
 		shouldTakeTransition: func(ctx context) bool {
 			return ctx.getVariable(headerKey) == 3
@@ -148,7 +147,7 @@ func TestLoop(t *testing.T) {
 	})
 
 	state1.transitions = append(state1.transitions, transition{
-		to: state1,
+		to:       state1,
 		priority: 1,
 		shouldTakeTransition: func(ctx context) bool {
 			return ctx.getVariable(headerKey).(int) < 3
@@ -227,7 +226,7 @@ func TestComplexCondition(t *testing.T) {
 	}
 
 	state1.transitions = append(state1.transitions, transition{
-		to: state2,
+		to:       state2,
 		priority: 2,
 		shouldTakeTransition: func(ctx context) bool {
 			return true
@@ -235,7 +234,7 @@ func TestComplexCondition(t *testing.T) {
 	})
 
 	state1.transitions = append(state1.transitions, transition{
-		to: state3,
+		to:       state3,
 		priority: 2,
 		shouldTakeTransition: func(ctx context) bool {
 			return false
@@ -243,7 +242,7 @@ func TestComplexCondition(t *testing.T) {
 	})
 
 	state2.transitions = append(state2.transitions, transition{
-		to: state4,
+		to:       state4,
 		priority: 1,
 		shouldTakeTransition: func(ctx context) bool {
 			return true
@@ -251,7 +250,7 @@ func TestComplexCondition(t *testing.T) {
 	})
 
 	state4.transitions = append(state4.transitions, transition{
-		to: state5,
+		to:       state5,
 		priority: 1,
 		shouldTakeTransition: func(ctx context) bool {
 			return true
@@ -259,7 +258,7 @@ func TestComplexCondition(t *testing.T) {
 	})
 
 	state3.transitions = append(state3.transitions, transition{
-		to: state5,
+		to:       state5,
 		priority: 1,
 		shouldTakeTransition: func(ctx context) bool {
 			return true
@@ -267,7 +266,7 @@ func TestComplexCondition(t *testing.T) {
 	})
 
 	state1.transitions = append(state1.transitions, transition{
-		to: state5,
+		to:       state5,
 		priority: 1,
 		shouldTakeTransition: func(ctx context) bool {
 			return true
