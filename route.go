@@ -37,6 +37,9 @@ type (
 		// transaction status
 		status         transactionStatus
 
+		// naming the state
+		counter *counter
+
 	}
 
 	stateStack struct {
@@ -80,6 +83,7 @@ func NewRoute(routeId string) *route {
 	return &route{
 		id:          routeId,
 		statemachine: &statemachine{},
+		counter: newCounter(),
 	}
 }
 
@@ -87,6 +91,7 @@ func NewRoute(routeId string) *route {
 // AddNextStep add new step to route
 func (r *route) AddNextStep(step TransactionalStep) *route {
 	s := &state{
+		name: "state_" + r.counter.next(),
 		action: r.defineAction(step),
 	}
 
@@ -108,6 +113,7 @@ func (r *route) AddNextStep(step TransactionalStep) *route {
 // When to define a condition
 func (r *route) When(predicate func(ctx context) bool, step TransactionalStep) *route {
 	s := &state{
+		name: "state_" + r.counter.subCount(),
 		action: r.defineAction(step),
 	}
 
@@ -121,7 +127,9 @@ func (r *route) When(predicate func(ctx context) bool, step TransactionalStep) *
 
 // Otherwise when condition
 func (r *route) Otherwise(step TransactionalStep) *route {
+	r.counter.endSubCounting()
 	s := &state{
+		name: "state_ot_" + r.counter.subCount(),
 		action: r.defineAction(step),
 	}
 
@@ -143,7 +151,10 @@ func (r *route) Otherwise(step TransactionalStep) *route {
 
 // End of condition
 func (r *route) End(step TransactionalStep) *route {
+	r.counter.endSubCounting()
+
 	s := &state{
+		name: "state_" + r.counter.next(),
 		action: r.defineAction(step),
 	}
 
