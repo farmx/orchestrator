@@ -69,6 +69,6 @@ func (sm *statemachine) next() (err error) {
 	return err
 }
 
-func (sm *statemachine) getMemento() (state, context) {
-	return *sm.currentState, *sm.context
+func (sm *statemachine) getMemento() (*state, context) {
+	return sm.currentState, *sm.context
 }

@@ -6,21 +6,13 @@ type TransactionalStep interface {
 	UndoAction(ctx context)
 }
 
-type transactionStatus string
-
 const (
 	Condition     int = 2
 	Default       int = 1
-
-	Started transactionStatus = "STARTED"
-	Success transactionStatus = "SUCCESS"
-	Fail    transactionStatus = "FAIL"
 )
 
 type (
 	route struct {
-		// route identifier
-		id             string
 
 		// rootStates graph root state
 		rootStates *state
@@ -28,14 +20,8 @@ type (
 		// latest added state
 		lastState *state
 
-		// statemachine ...
-		statemachine *statemachine
-
 		// conditionStateStack keep condition steps for otherwise/end-condition purpose
 		predicateStack stateStack
-
-		// transaction status
-		status         transactionStatus
 
 		// naming the state
 		counter *counter
@@ -78,18 +64,15 @@ func (tss *stateStack) pop() predicateState {
 	return s
 }
 
-// NewRoute define and return a route
-func NewRoute(routeId string) *route {
+// newRoute define and return a route
+func newRoute() *route {
 	return &route{
-		id:          routeId,
-		statemachine: &statemachine{},
 		counter: newCounter(),
 	}
 }
 
-// AddNextStep TODO: define retry on each state as a transition
-// AddNextStep add new step to route
-func (r *route) AddNextStep(step TransactionalStep) *route {
+// addNextStep add new step to route
+func (r *route) addNextStep(step TransactionalStep) *route {
 	s := &state{
 		name: "state_" + r.counter.next(),
 		action: r.defineAction(step),
@@ -110,8 +93,8 @@ func (r *route) AddNextStep(step TransactionalStep) *route {
 	return r
 }
 
-// When to define a condition
-func (r *route) When(predicate func(ctx context) bool, step TransactionalStep) *route {
+// when to define a condition
+func (r *route) when(predicate func(ctx context) bool, step TransactionalStep) *route {
 	s := &state{
 		name: "state_" + r.counter.subCount(),
 		action: r.defineAction(step),
@@ -125,8 +108,8 @@ func (r *route) When(predicate func(ctx context) bool, step TransactionalStep) *
 	return r
 }
 
-// Otherwise when condition
-func (r *route) Otherwise(step TransactionalStep) *route {
+// otherwise when condition
+func (r *route) otherwise(step TransactionalStep) *route {
 	r.counter.endSubCounting()
 	s := &state{
 		name: "state_ot_" + r.counter.subCount(),
@@ -149,8 +132,8 @@ func (r *route) Otherwise(step TransactionalStep) *route {
 //       \    |    /
 //        end state
 
-// End of condition
-func (r *route) End(step TransactionalStep) *route {
+// end of condition
+func (r *route) end(step TransactionalStep) *route {
 	r.counter.endSubCounting()
 
 	s := &state{
@@ -180,14 +163,8 @@ func (r *route) End(step TransactionalStep) *route {
 	return r
 }
 
-
-func (r *route) Exec(ctx context) {
-	r.status = Started
-	r.statemachine.init(r.rootStates, ctx)
-
-	for r.statemachine.hastNext() {
-		_ = r.statemachine.next()
-	}
+func (r *route) getRouteStateMachine() *state {
+	return r.rootStates
 }
 
 func (r *route) defineAction(step TransactionalStep) func(ctx *context) error {
