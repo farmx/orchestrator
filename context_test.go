@@ -12,21 +12,21 @@ func TestSetConstant(t *testing.T) {
 	headerValue2 := "HEADER_VALUE_2"
 
 	ctx, _ := NewContext()
-	if err := ctx.setConstant(headerKey, headerValue); err != nil {
+	if err := ctx.SetConstant(headerKey, headerValue); err != nil {
 		t.Fail()
 	}
 
-	if err := ctx.setConstant(headerKey2, headerValue2); err != nil {
+	if err := ctx.SetConstant(headerKey2, headerValue2); err != nil {
 		t.Fail()
 	}
 
-	if err := ctx.setConstant(headerKey2, headerValue); err == nil {
+	if err := ctx.SetConstant(headerKey2, headerValue); err == nil {
 		t.Fail()
 	}
 
-	assert.NotNil(t, ctx.getGid())
-	assert.Equal(t, ctx.getConstant(headerKey), headerValue)
-	assert.Equal(t, ctx.getConstant(headerKey2), headerValue2)
+	assert.NotNil(t, ctx.GetGid())
+	assert.Equal(t, ctx.GetConstant(headerKey), headerValue)
+	assert.Equal(t, ctx.GetConstant(headerKey2), headerValue2)
 }
 
 func TestSetVariable(t *testing.T) {
@@ -36,11 +36,11 @@ func TestSetVariable(t *testing.T) {
 	headerValue2 := "HEADER_VALUE_2"
 
 	ctx, _ := NewContext()
-	ctx.setVariable(headerKey, headerValue)
-	ctx.setVariable(headerKey2, headerValue2)
-	ctx.setVariable(headerKey2, headerValue)
+	ctx.SetVariable(headerKey, headerValue)
+	ctx.SetVariable(headerKey2, headerValue2)
+	ctx.SetVariable(headerKey2, headerValue)
 
-	assert.NotNil(t, ctx.getGid())
-	assert.Equal(t, headerValue, ctx.getVariable(headerKey))
-	assert.Equal(t, headerValue, ctx.getVariable(headerKey2))
+	assert.NotNil(t, ctx.GetGid())
+	assert.Equal(t, headerValue, ctx.GetVariable(headerKey))
+	assert.Equal(t, headerValue, ctx.GetVariable(headerKey2))
 }

@@ -33,22 +33,22 @@ type (
 	}
 )
 
-func (sm *statemachine) init(currentState *state, ctx context) {
+func (sm *statemachine) init(currentState *state, ctx *context) {
 	sm.currentState = currentState
-	sm.context = &ctx
+	sm.context = ctx
 
-	if sm.context.getVariable(SMStatusHeaderKey) == nil {
-		sm.context.setVariable(SMStatusHeaderKey, SMInProgress)
+	if sm.context.GetVariable(SMStatusHeaderKey) == nil {
+		sm.context.SetVariable(SMStatusHeaderKey, SMInProgress)
 	}
 }
 
 func (sm *statemachine) hastNext() bool {
-	return sm.context.getVariable(SMStatusHeaderKey) != SMEnd
+	return sm.context.GetVariable(SMStatusHeaderKey) != SMEnd
 }
 
 func (sm *statemachine) next() (err error) {
 	if err = sm.currentState.action(sm.context); err != nil {
-		sm.context.setVariable(SMStatusHeaderKey, SMRollback)
+		sm.context.SetVariable(SMStatusHeaderKey, SMRollback)
 	}
 
 	// sort based on priority
@@ -63,7 +63,7 @@ func (sm *statemachine) next() (err error) {
 		}
 	}
 
-	sm.context.setVariable(SMStatusHeaderKey, SMEnd)
+	sm.context.SetVariable(SMStatusHeaderKey, SMEnd)
 	return err
 }
 

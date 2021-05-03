@@ -1,10 +1,5 @@
 package orchestrator
 
-type TransactionalStep interface {
-	DoAction(ctx *context) error
-	UndoAction(ctx context)
-}
-
 const (
 	Condition int = 2
 	Default   int = 1
@@ -70,10 +65,10 @@ func newRoute() *route {
 }
 
 // addNextStep add new step to route
-func (r *route) addNextStep(step TransactionalStep) *route {
+func (r *route) addNextStep(doAction func(ctx *context) error,undoAction func(ctx context)) *route {
 	s := &state{
 		name:   "state_" + r.counter.next(),
-		action: r.defineAction(step),
+		action: r.defineAction(doAction, undoAction),
 	}
 
 	if r.rootStates == nil {
@@ -82,7 +77,7 @@ func (r *route) addNextStep(step TransactionalStep) *route {
 
 	if r.lastState != nil {
 		r.defineTwoWayTransition(r.lastState, Default, func(ctx context) bool {
-			return ctx.getVariable(SMStatusHeaderKey) != SMRollback
+			return ctx.GetVariable(SMStatusHeaderKey) != SMRollback
 		}, s)
 	}
 
@@ -92,10 +87,10 @@ func (r *route) addNextStep(step TransactionalStep) *route {
 }
 
 // when to define a condition
-func (r *route) when(predicate func(ctx context) bool, step TransactionalStep) *route {
+func (r *route) when(predicate func(ctx context) bool, doAction func(ctx *context) error,undoAction func(ctx context)) *route {
 	s := &state{
-		name:   "state_" + r.counter.subCount(),
-		action: r.defineAction(step),
+		name:   "state_c_" + r.counter.subCount(),
+		action: r.defineAction(doAction, undoAction),
 	}
 
 	r.predicateStack.push(predicate, r.lastState)
@@ -107,11 +102,11 @@ func (r *route) when(predicate func(ctx context) bool, step TransactionalStep) *
 }
 
 // otherwise when condition
-func (r *route) otherwise(step TransactionalStep) *route {
+func (r *route) otherwise(doAction func(ctx *context) error,undoAction func(ctx context)) *route {
 	r.counter.endSubCounting()
 	s := &state{
-		name:   "state_ot_" + r.counter.subCount(),
-		action: r.defineAction(step),
+		name:   "state_!c_" + r.counter.subCount(),
+		action: r.defineAction(doAction, undoAction),
 	}
 
 	ps := r.predicateStack.getLast()
@@ -123,20 +118,20 @@ func (r *route) otherwise(step TransactionalStep) *route {
 	return r
 }
 
-//        condition
-//       /    |    \
-//     not   no    yes
-//  included  |     |
-//       \    |    /
-//        end state
+//        condition       condition
+//       /         \        |   \
+//     not         yes      no   yes
+//  included        |       |    |
+//       \         /        |   /
+//        end state       end state
 
 // end of condition
-func (r *route) end(step TransactionalStep) *route {
+func (r *route) end(doAction func(ctx *context) error,undoAction func(ctx context)) *route {
 	r.counter.endSubCounting()
 
 	s := &state{
 		name:   "state_" + r.counter.next(),
-		action: r.defineAction(step),
+		action: r.defineAction(doAction, undoAction),
 	}
 
 	predicate := func(ctx context) bool {
@@ -165,14 +160,14 @@ func (r *route) getRouteStateMachine() *state {
 	return r.rootStates
 }
 
-func (r *route) defineAction(step TransactionalStep) func(ctx *context) error {
+func (r *route) defineAction(doAction func(ctx *context) error,undoAction func(ctx context)) func(ctx *context) error {
 	return func(ctx *context) error {
-		if ctx.getVariable(SMStatusHeaderKey) == SMRollback {
-			step.UndoAction(*ctx)
+		if ctx.GetVariable(SMStatusHeaderKey) == SMRollback {
+			undoAction(*ctx)
 			return nil
 		}
 
-		return step.DoAction(ctx)
+		return doAction(ctx)
 	}
 }
 
@@ -189,7 +184,7 @@ func (r *route) defineTwoWayTransition(src *state, priority int, predicate func(
 		to:       src,
 		priority: Default,
 		shouldTakeTransition: func(ctx context) bool {
-			return ctx.getVariable(SMStatusHeaderKey) == SMRollback
+			return ctx.GetVariable(SMStatusHeaderKey) == SMRollback
 		},
 	})
 }
@@ -208,7 +203,7 @@ func (r *route) getConditionalLastStates(root *state) []*state {
 func lastState(state *state) *state {
 	for _, tr := range state.transitions {
 		ctx, _ := NewContext()
-		ctx.setVariable(SMStatusHeaderKey, SMRollback)
+		ctx.SetVariable(SMStatusHeaderKey, SMRollback)
 		if tr.priority == Default && !tr.shouldTakeTransition(*ctx) {
 			return lastState(tr.to)
 		}

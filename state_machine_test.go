@@ -32,30 +32,30 @@ func TestHappyScenario(t *testing.T) {
 
 	ctx, _ := NewContext()
 	sm := &statemachine{}
-	sm.init(state1, *ctx)
+	sm.init(state1, ctx)
 
 	// init time
 	assert.Equal(t, true, sm.hastNext())
 	assert.Equal(t, state1, sm.currentState)
-	assert.Equal(t, SMInProgress, sm.context.getVariable(SMStatusHeaderKey))
+	assert.Equal(t, SMInProgress, sm.context.GetVariable(SMStatusHeaderKey))
 
 	// cycle one
 	assert.Nil(t, sm.next())
 	assert.Equal(t, state2, sm.currentState)
-	assert.Equal(t, SMInProgress, sm.context.getVariable(SMStatusHeaderKey))
+	assert.Equal(t, SMInProgress, sm.context.GetVariable(SMStatusHeaderKey))
 	assert.Equal(t, true, sm.hastNext())
 
 	// cycle three
 	assert.Nil(t, sm.next())
 	assert.Equal(t, false, sm.hastNext())
 	assert.Equal(t, state2, sm.currentState)
-	assert.Equal(t, SMEnd, sm.context.getVariable(SMStatusHeaderKey))
+	assert.Equal(t, SMEnd, sm.context.GetVariable(SMStatusHeaderKey))
 }
 
 func TestRollback(t *testing.T) {
 	state1 := &state{
 		action: func(ctx *context) error {
-			if ctx.getVariable(SMStatusHeaderKey) == SMRollback {
+			if ctx.GetVariable(SMStatusHeaderKey) == SMRollback {
 				log.Print("rollback call")
 				return nil
 			}
@@ -76,7 +76,7 @@ func TestRollback(t *testing.T) {
 		to:       state2,
 		priority: 1,
 		shouldTakeTransition: func(ctx context) bool {
-			return ctx.getVariable(SMStatusHeaderKey) != SMRollback
+			return ctx.GetVariable(SMStatusHeaderKey) != SMRollback
 		},
 	})
 
@@ -84,36 +84,36 @@ func TestRollback(t *testing.T) {
 		to:       state1,
 		priority: 1,
 		shouldTakeTransition: func(ctx context) bool {
-			return ctx.getVariable(SMStatusHeaderKey) == SMRollback
+			return ctx.GetVariable(SMStatusHeaderKey) == SMRollback
 		},
 	})
 
 	ctx, _ := NewContext()
 	sm := &statemachine{}
-	sm.init(state1, *ctx)
+	sm.init(state1, ctx)
 
 	// init time
 	assert.Equal(t, true, sm.hastNext())
 	assert.Equal(t, state1, sm.currentState)
-	assert.Equal(t, SMInProgress, sm.context.getVariable(SMStatusHeaderKey))
+	assert.Equal(t, SMInProgress, sm.context.GetVariable(SMStatusHeaderKey))
 
 	// cycle one
 	assert.Nil(t, sm.next())
 	assert.Equal(t, state2, sm.currentState)
-	assert.Equal(t, SMInProgress, sm.context.getVariable(SMStatusHeaderKey))
+	assert.Equal(t, SMInProgress, sm.context.GetVariable(SMStatusHeaderKey))
 	assert.Equal(t, true, sm.hastNext())
 
 	// cycle two
 	assert.NotNil(t, sm.next())
 	assert.Equal(t, state1, sm.currentState)
-	assert.Equal(t, SMRollback, sm.context.getVariable(SMStatusHeaderKey))
+	assert.Equal(t, SMRollback, sm.context.GetVariable(SMStatusHeaderKey))
 	assert.Equal(t, true, sm.hastNext())
 
 	// cycle three
 	assert.Nil(t, sm.next())
 	assert.Equal(t, false, sm.hastNext())
 	assert.Equal(t, state1, sm.currentState)
-	assert.Equal(t, SMEnd, sm.context.getVariable(SMStatusHeaderKey))
+	assert.Equal(t, SMEnd, sm.context.GetVariable(SMStatusHeaderKey))
 }
 
 func TestLoop(t *testing.T) {
@@ -121,11 +121,11 @@ func TestLoop(t *testing.T) {
 
 	state1 := &state{
 		action: func(ctx *context) error {
-			if v := ctx.getVariable(headerKey); v == nil {
-				ctx.setVariable(headerKey, 0)
+			if v := ctx.GetVariable(headerKey); v == nil {
+				ctx.SetVariable(headerKey, 0)
 			}
 
-			ctx.setVariable(headerKey, ctx.getVariable(headerKey).(int)+1)
+			ctx.SetVariable(headerKey, ctx.GetVariable(headerKey).(int)+1)
 			log.Print("state 1 action")
 			return nil
 		},
@@ -142,7 +142,7 @@ func TestLoop(t *testing.T) {
 		to:       state2,
 		priority: 1,
 		shouldTakeTransition: func(ctx context) bool {
-			return ctx.getVariable(headerKey) == 3
+			return ctx.GetVariable(headerKey) == 3
 		},
 	})
 
@@ -150,37 +150,37 @@ func TestLoop(t *testing.T) {
 		to:       state1,
 		priority: 1,
 		shouldTakeTransition: func(ctx context) bool {
-			return ctx.getVariable(headerKey).(int) < 3
+			return ctx.GetVariable(headerKey).(int) < 3
 		},
 	})
 
 	ctx, _ := NewContext()
 	sm := &statemachine{}
-	sm.init(state1, *ctx)
+	sm.init(state1, ctx)
 
 	// cycle one
 	assert.Equal(t, true, sm.hastNext())
 	assert.Nil(t, sm.next())
 	assert.Equal(t, state1, sm.currentState)
-	assert.Equal(t, SMInProgress, sm.context.getVariable(SMStatusHeaderKey))
+	assert.Equal(t, SMInProgress, sm.context.GetVariable(SMStatusHeaderKey))
 
 	// cycle two
 	assert.Equal(t, true, sm.hastNext())
 	assert.Nil(t, sm.next())
 	assert.Equal(t, state1, sm.currentState)
-	assert.Equal(t, SMInProgress, sm.context.getVariable(SMStatusHeaderKey))
+	assert.Equal(t, SMInProgress, sm.context.GetVariable(SMStatusHeaderKey))
 
 	// cycle three
 	assert.Equal(t, true, sm.hastNext())
 	assert.Nil(t, sm.next())
 	assert.Equal(t, state2, sm.currentState)
-	assert.Equal(t, SMInProgress, sm.context.getVariable(SMStatusHeaderKey))
+	assert.Equal(t, SMInProgress, sm.context.GetVariable(SMStatusHeaderKey))
 
 	// cycle four
 	assert.Equal(t, true, sm.hastNext())
 	assert.Nil(t, sm.next())
 	assert.Equal(t, state2, sm.currentState)
-	assert.Equal(t, SMEnd, sm.context.getVariable(SMStatusHeaderKey))
+	assert.Equal(t, SMEnd, sm.context.GetVariable(SMStatusHeaderKey))
 
 }
 
@@ -275,7 +275,7 @@ func TestComplexCondition(t *testing.T) {
 
 	ctx, _ := NewContext()
 	sm := &statemachine{}
-	sm.init(state1, *ctx)
+	sm.init(state1, ctx)
 
 	for sm.hastNext() {
 		_ = sm.next()

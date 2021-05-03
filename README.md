@@ -3,11 +3,11 @@ Orchestrator is a platform to handle process chain. each chain can be "transacti
 basically, chain is transaction (has process and failed handlers) if the state is not transaction the developer can implement an empty function for failure handler
 
 the main functionality:
-- session manager
-- journaling
-- restore system last state at warm-up
-- graceful shutdown
-- error handling
+- [X] journaling
+- [X] error handling
+- [X] horizontal statemachine
+- [] restore system last state at warm-up
+- [] graceful shutdown
 
 Not support
 - Load balancing

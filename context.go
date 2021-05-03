@@ -33,11 +33,11 @@ func NewContextWithGid(gid string) (*context, error) {
 	}, nil
 }
 
-func (ctx *context) getConstant(key string) interface{} {
+func (ctx *context) GetConstant(key string) interface{} {
 	return ctx.constant[key]
 }
 
-func (ctx *context) setConstant(key string, value interface{}) error {
+func (ctx *context) SetConstant(key string, value interface{}) error {
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
 	if ctx.constant[key] != nil {
@@ -48,17 +48,17 @@ func (ctx *context) setConstant(key string, value interface{}) error {
 	return nil
 }
 
-func (ctx *context) setVariable(key string, value interface{}) {
+func (ctx *context) SetVariable(key string, value interface{}) {
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
 
 	ctx.variables[key] = value
 }
 
-func (ctx *context) getVariable(key string) interface{} {
+func (ctx *context) GetVariable(key string) interface{} {
 	return ctx.variables[key]
 }
 
-func (ctx *context) getGid() string {
+func (ctx *context) GetGid() string {
 	return ctx.gid
 }

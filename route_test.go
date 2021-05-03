@@ -9,121 +9,121 @@ type alwaysPassTransactionMock struct {
 	TransactionalStep
 }
 
-func (aptm *alwaysPassTransactionMock) DoAction(ctx *context) error {
-	if ctx.getVariable("HK") == nil {
-		ctx.setVariable("HK", 0)
+func doActionTest(ctx *context) error {
+	if ctx.GetVariable("HK") == nil {
+		ctx.SetVariable("HK", 0)
 	}
 
-	ctx.setVariable("HK", ctx.getVariable("HK").(int)+1)
+	ctx.SetVariable("HK", ctx.GetVariable("HK").(int)+1)
 	return nil
 }
 
-func (aptm *alwaysPassTransactionMock) UndoAction(ctx context) {
+func undoActionTest(ctx context) {
 
 }
 
 func execTestRoute(route *state) *routeHandler {
-	rh := newRouteHandler("sample", route, nil)
+	rh := newRouteHandler(route, nil)
 	ctx, _ := NewContext()
 
-	rh.exec(*ctx)
+	rh.exec(ctx, nil)
 	return rh
 }
 
 func TestDefineUnconditionalRoute(t *testing.T) {
 	r := newRoute().
-		addNextStep(&alwaysPassTransactionMock{}).
-		addNextStep(&alwaysPassTransactionMock{}).
-		addNextStep(&alwaysPassTransactionMock{})
+		addNextStep(doActionTest, undoActionTest).
+		addNextStep(doActionTest, undoActionTest).
+		addNextStep(doActionTest, undoActionTest)
 
 	rh := execTestRoute(r.getRouteStateMachine())
 
-	assert.Equal(t, 3, rh.statemachine.context.getVariable("HK"))
+	assert.Equal(t, 3, rh.statemachine.context.GetVariable("HK"))
 }
 
 func TestDefineConditionalRoute(t *testing.T) {
 	r := newRoute().
-		addNextStep(&alwaysPassTransactionMock{}).
-		addNextStep(&alwaysPassTransactionMock{}).
+		addNextStep(doActionTest, undoActionTest).
+		addNextStep(doActionTest, undoActionTest).
 		when(func(ctx context) bool { return true },
-			&alwaysPassTransactionMock{}).
-		addNextStep(&alwaysPassTransactionMock{}).
-		addNextStep(&alwaysPassTransactionMock{})
+			doActionTest, undoActionTest).
+		addNextStep(doActionTest, undoActionTest).
+		addNextStep(doActionTest, undoActionTest)
 
 	rh := execTestRoute(r.getRouteStateMachine())
 
-	assert.Equal(t, 5, rh.statemachine.context.getVariable("HK"))
+	assert.Equal(t, 5, rh.statemachine.context.GetVariable("HK"))
 
 	rf := newRoute().
-		addNextStep(&alwaysPassTransactionMock{}).
-		addNextStep(&alwaysPassTransactionMock{}).
+		addNextStep(doActionTest, undoActionTest).
+		addNextStep(doActionTest, undoActionTest).
 		when(func(ctx context) bool { return false },
-			&alwaysPassTransactionMock{}).
-		addNextStep(&alwaysPassTransactionMock{}).
-		addNextStep(&alwaysPassTransactionMock{})
+			doActionTest, undoActionTest).
+		addNextStep(doActionTest, undoActionTest).
+		addNextStep(doActionTest, undoActionTest)
 
 	rh = execTestRoute(rf.getRouteStateMachine())
 
-	assert.Equal(t, 2, rh.statemachine.context.getVariable("HK"))
+	assert.Equal(t, 2, rh.statemachine.context.GetVariable("HK"))
 }
 
 func TestDefineNestedConditionalRoute(t *testing.T) {
 	r := newRoute().
-		addNextStep(&alwaysPassTransactionMock{}).
-		addNextStep(&alwaysPassTransactionMock{}).
+		addNextStep(doActionTest, undoActionTest).
+		addNextStep(doActionTest, undoActionTest).
 		when(func(ctx context) bool { return true },
-			&alwaysPassTransactionMock{}).
+			doActionTest, undoActionTest).
 		when(func(ctx context) bool { return true },
-			&alwaysPassTransactionMock{}).
-		addNextStep(&alwaysPassTransactionMock{}).
-		addNextStep(&alwaysPassTransactionMock{})
+			doActionTest, undoActionTest).
+		addNextStep(doActionTest, undoActionTest).
+		addNextStep(doActionTest, undoActionTest)
 
 	rh := execTestRoute(r.getRouteStateMachine())
 
-	assert.Equal(t, 6, rh.statemachine.context.getVariable("HK"))
+	assert.Equal(t, 6, rh.statemachine.context.GetVariable("HK"))
 }
 
 func TestDefineConditionWithOtherwiseRoute(t *testing.T) {
 	r := newRoute().
-		addNextStep(&alwaysPassTransactionMock{}).
-		addNextStep(&alwaysPassTransactionMock{}).
+		addNextStep(doActionTest, undoActionTest).
+		addNextStep(doActionTest, undoActionTest).
 		when(func(ctx context) bool { return true },
-			&alwaysPassTransactionMock{}).
-		addNextStep(&alwaysPassTransactionMock{}).
-		otherwise(&alwaysPassTransactionMock{}).
-		addNextStep(&alwaysPassTransactionMock{}).
-		addNextStep(&alwaysPassTransactionMock{})
+			doActionTest, undoActionTest).
+		addNextStep(doActionTest, undoActionTest).
+		otherwise(doActionTest, undoActionTest).
+		addNextStep(doActionTest, undoActionTest).
+		addNextStep(doActionTest, undoActionTest)
 
 	rh := execTestRoute(r.getRouteStateMachine())
 
-	assert.Equal(t, 4, rh.statemachine.context.getVariable("HK"))
+	assert.Equal(t, 4, rh.statemachine.context.GetVariable("HK"))
 }
 
 func TestDefineConditionWithOtherwiseAndEndRoute(t *testing.T) {
 	r := newRoute().
-		addNextStep(&alwaysPassTransactionMock{}).
-		addNextStep(&alwaysPassTransactionMock{}).
+		addNextStep(doActionTest, undoActionTest).
+		addNextStep(doActionTest, undoActionTest).
 		when(func(ctx context) bool { return false },
-			&alwaysPassTransactionMock{}).
-		otherwise(&alwaysPassTransactionMock{}).
-		addNextStep(&alwaysPassTransactionMock{}).
-		addNextStep(&alwaysPassTransactionMock{})
+			doActionTest, undoActionTest).
+		otherwise(doActionTest, undoActionTest).
+		addNextStep(doActionTest, undoActionTest).
+		addNextStep(doActionTest, undoActionTest)
 
 	rh := execTestRoute(r.getRouteStateMachine())
 
-	assert.Equal(t, 5, rh.statemachine.context.getVariable("HK"))
+	assert.Equal(t, 5, rh.statemachine.context.GetVariable("HK"))
 }
 
 func TestDefineRoute(t *testing.T) {
 	r := newRoute().
-		addNextStep(&alwaysPassTransactionMock{}).
+		addNextStep(doActionTest, undoActionTest).
 		when(func(ctx context) bool { return true },
-			&alwaysPassTransactionMock{}).
-		addNextStep(&alwaysPassTransactionMock{}).
-		otherwise(&alwaysPassTransactionMock{}).
-		end(&alwaysPassTransactionMock{})
+			doActionTest, undoActionTest).
+		addNextStep(doActionTest, undoActionTest).
+		otherwise(doActionTest, undoActionTest).
+		end(doActionTest, undoActionTest)
 
 	rh := execTestRoute(r.getRouteStateMachine())
 
-	assert.Equal(t, 4, rh.statemachine.context.getVariable("HK"))
+	assert.Equal(t, 4, rh.statemachine.context.GetVariable("HK"))
 }

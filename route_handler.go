@@ -28,16 +28,15 @@ type routeHandler struct {
 }
 
 // route is root state
-func newRouteHandler(id string, routeRootState *state, recoveryRootState *state) *routeHandler {
+func newRouteHandler(routeRootState *state, recoveryRootState *state) *routeHandler {
 	return &routeHandler{
-		id:                id,
 		routeRootState:    routeRootState,
 		recoveryRootState: recoveryRootState,
 		statemachine:      &statemachine{},
 	}
 }
 
-func (rh *routeHandler) exec(ctx context) {
+func (rh *routeHandler) exec(ctx *context, errCh chan<- error) {
 	rh.statemachine.init(rh.routeRootState, ctx)
 	rh.status = InProgress
 
@@ -50,16 +49,17 @@ func (rh *routeHandler) exec(ctx context) {
 		}
 
 		rh.status = Fail
+		errCh <- err
 
 		if rh.recoveryRootState != nil {
-			rh.statemachine.init(rh.recoveryRootState, mctx)
+			rh.statemachine.init(rh.recoveryRootState, &mctx)
 
 			// skip recovery route error
 			for rh.statemachine.hastNext() {
 				_ = rh.statemachine.next()
 			}
 
-			rh.statemachine.init(mst, mctx)
+			rh.statemachine.init(mst, &mctx)
 		}
 	}
 
