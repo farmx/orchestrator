@@ -6,8 +6,8 @@ the main functionality:
 - [X] journaling
 - [X] error handling
 - [X] horizontal statemachine
-- [] restore system last state at warm-up
-- [] graceful shutdown
+- [ ] restore system last state at warm-up
+- [ ] graceful shutdown
 
 Not support
 - Load balancing
