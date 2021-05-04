@@ -6,8 +6,6 @@ import (
 	"log"
 )
 
-//  TODO: Inject chain undoAction strategy in each atomic route handler
-
 // Every route is created from multiple state those are connected with and edge
 // Each edge has a priority and a condition
 // To go to the next step the edge sorted by priority and the first do-Action which comply with the condition called
@@ -35,7 +33,7 @@ type TransactionalStep interface {
 func NewOrchestrator() *orchestrator {
 	o := &orchestrator{
 		routes: make(map[string]*route),
-		eh: &errorHandler{},
+		eh:     &errorHandler{},
 	}
 
 	// TODO: remove
@@ -97,6 +95,15 @@ func (o *orchestrator) notifier(ctx *context, endpoint string) error {
 	o.rh.exec(ctx, o.eh.errCh)
 
 	return nil
+}
+
+func (o *orchestrator) exec(from string, ctx *context, errCh chan error) {
+	if o.routes[from] == nil {
+		log.Fatalf("route does not exists")
+	}
+
+	rh := newRouteHandler(o.routes[from].getRouteStateMachine(), nil)
+	rh.exec(ctx, errCh)
 }
 
 func (o *orchestrator) shutdown() error {

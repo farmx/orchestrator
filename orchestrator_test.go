@@ -1,35 +1,69 @@
 package orchestrator
 
-import "testing"
+import (
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
 
 type passStep struct {
 	TransactionalStep
 }
 
-func (ps *passStep) doAction(ctx *context) error {
-	println("doAction")
+func (ps *passStep) DoAction(ctx *context) error {
+	fv := ctx.GetVariable("A")
+
+	if fv == nil {
+		ctx.SetVariable("A", 1)
+		return nil
+	}
+
+	ctx.SetVariable("A", fv.(int) + 1)
 	return nil
 }
 
-func (ps *passStep) undoAction(ctx context) {
-	println("undoAction")
+func (ps *passStep) UndoAction(ctx context) {
+	ctx.SetVariable("A", ctx.GetVariable("A").(int) - 1)
+}
+
+type bPassStep struct {
+	TransactionalStep
+}
+
+func (ps *bPassStep) DoAction(ctx *context) error {
+	fv := ctx.GetVariable("B")
+
+	if fv == nil {
+		ctx.SetVariable("B", 1)
+		return nil
+	}
+
+	ctx.SetVariable("B", fv.(int) + 1)
+	return nil
+}
+
+func (ps *bPassStep) UndoAction(ctx context) {
+	ctx.SetVariable("A", ctx.GetVariable("B").(int) - 1)
 }
 
 func TestSample(t *testing.T) {
-	/*
-		orch := NewOrchestrator()
-		orch.addProcess(&passStep{}).
-			when().
-			addProcess().
-			addProcess().
-			elseThen().
-			addProcess().
-			end().end()
+	aRoute := "A_ROUTE"
+	bRoute := "B_ROUTE"
 
-		orch.exec()
-	*/
+	orch := NewOrchestrator()
+	orch.
+		From(aRoute).
+		AddStep(&passStep{}).
+		When(func(ctx context) bool {
+			return true
+		}, &passStep{}).
+		To(bRoute).
+		End(&passStep{})
 
-	//if err := orch.exec(); err != nil {
-	//	t.Fail()
-	//}
+	orch.From(bRoute).AddStep(&bPassStep{})
+
+	ctx, _ := NewContext()
+	orch.exec(aRoute, ctx, nil)
+
+	assert.Equal(t, 2, ctx.GetVariable("A"))
+	assert.Equal(t, 1, ctx.GetVariable("B"))
 }
