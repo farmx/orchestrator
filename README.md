@@ -5,7 +5,7 @@ basically, chain is transaction (has process and failed handlers) if the state i
 the main functionality:
 - [X] journaling
 - [X] error handling
-- [X] horizontal statemachine
+- [X] hierarchical statemachine
 - [ ] restore system last state at warm-up
 - [ ] graceful shutdown
 
