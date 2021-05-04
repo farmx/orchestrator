@@ -45,7 +45,7 @@ func (ps *bPassStep) UndoAction(ctx context) {
 	ctx.SetVariable("A", ctx.GetVariable("B").(int) - 1)
 }
 
-func TestSample(t *testing.T) {
+func TestOrchestrator_Exec(t *testing.T) {
 	aRoute := "A_ROUTE"
 	bRoute := "B_ROUTE"
 
@@ -55,14 +55,13 @@ func TestSample(t *testing.T) {
 		AddStep(&passStep{}).
 		When(func(ctx context) bool {
 			return true
-		}, &passStep{}).
-		To(bRoute).
+		}, &passStep{}).To(bRoute).
 		End(&passStep{})
 
 	orch.From(bRoute).AddStep(&bPassStep{})
 
 	ctx, _ := NewContext()
-	orch.exec(aRoute, ctx, nil)
+	orch.Exec(aRoute, ctx, nil)
 
 	assert.Equal(t, 2, ctx.GetVariable("A"))
 	assert.Equal(t, 1, ctx.GetVariable("B"))

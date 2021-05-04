@@ -21,8 +21,7 @@ type orchestrator struct {
 	// route handler
 	rh *routeHandler
 
-	// error handler
-	eh *errorHandler
+	ec chan error
 }
 
 type TransactionalStep interface {
@@ -31,15 +30,9 @@ type TransactionalStep interface {
 }
 
 func NewOrchestrator() *orchestrator {
-	o := &orchestrator{
+	return &orchestrator{
 		routes: make(map[string]*route),
-		eh:     &errorHandler{},
 	}
-
-	// TODO: remove
-	go o.eh.handler()
-
-	return o
 }
 
 func (o *orchestrator) From(from string) *orchestrator {
@@ -92,18 +85,20 @@ func (o *orchestrator) notifier(ctx *context, endpoint string) error {
 	}
 
 	o.rh = newRouteHandler(o.routes[endpoint].getRouteStateMachine(), nil)
-	o.rh.exec(ctx, o.eh.errCh)
+	o.rh.exec(ctx, o.ec)
 
 	return nil
 }
 
-func (o *orchestrator) exec(from string, ctx *context, errCh chan error) {
+func (o *orchestrator) Exec(from string, ctx *context, errCh chan error) {
 	if o.routes[from] == nil {
 		log.Fatalf("route does not exists")
 	}
 
+	o.ec = errCh
 	rh := newRouteHandler(o.routes[from].getRouteStateMachine(), nil)
-	rh.exec(ctx, errCh)
+
+	rh.exec(ctx, o.ec)
 }
 
 func (o *orchestrator) shutdown() error {
