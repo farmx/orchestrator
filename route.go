@@ -65,7 +65,7 @@ func newRoute() *route {
 }
 
 // addNextStep add new step to route
-func (r *route) addNextStep(doAction func(ctx *context) error,undoAction func(ctx context)) *route {
+func (r *route) addNextStep(doAction func(ctx *context) error, undoAction func(ctx context)) *route {
 	s := &state{
 		name:   "state_" + r.counter.next(),
 		action: r.defineAction(doAction, undoAction),
@@ -87,7 +87,7 @@ func (r *route) addNextStep(doAction func(ctx *context) error,undoAction func(ct
 }
 
 // when to define a condition
-func (r *route) when(predicate func(ctx context) bool, doAction func(ctx *context) error,undoAction func(ctx context)) *route {
+func (r *route) when(predicate func(ctx context) bool, doAction func(ctx *context) error, undoAction func(ctx context)) *route {
 	s := &state{
 		name:   "state_c_" + r.counter.subCount(),
 		action: r.defineAction(doAction, undoAction),
@@ -102,7 +102,7 @@ func (r *route) when(predicate func(ctx context) bool, doAction func(ctx *contex
 }
 
 // otherwise when condition
-func (r *route) otherwise(doAction func(ctx *context) error,undoAction func(ctx context)) *route {
+func (r *route) otherwise(doAction func(ctx *context) error, undoAction func(ctx context)) *route {
 	r.counter.endSubCounting()
 	s := &state{
 		name:   "state_!c_" + r.counter.subCount(),
@@ -126,7 +126,7 @@ func (r *route) otherwise(doAction func(ctx *context) error,undoAction func(ctx 
 //        end state       end state
 
 // end of condition
-func (r *route) end(doAction func(ctx *context) error,undoAction func(ctx context)) *route {
+func (r *route) end(doAction func(ctx *context) error, undoAction func(ctx context)) *route {
 	r.counter.endSubCounting()
 
 	s := &state{
@@ -160,7 +160,7 @@ func (r *route) getRouteStateMachine() *state {
 	return r.rootStates
 }
 
-func (r *route) defineAction(doAction func(ctx *context) error,undoAction func(ctx context)) func(ctx *context) error {
+func (r *route) defineAction(doAction func(ctx *context) error, undoAction func(ctx context)) func(ctx *context) error {
 	return func(ctx *context) error {
 		if ctx.GetVariable(SMStatusHeaderKey) == SMRollback {
 			undoAction(*ctx)

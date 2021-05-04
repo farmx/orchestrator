@@ -17,12 +17,12 @@ func (ps *passStep) DoAction(ctx *context) error {
 		return nil
 	}
 
-	ctx.SetVariable("A", fv.(int) + 1)
+	ctx.SetVariable("A", fv.(int)+1)
 	return nil
 }
 
 func (ps *passStep) UndoAction(ctx context) {
-	ctx.SetVariable("A", ctx.GetVariable("A").(int) - 1)
+	ctx.SetVariable("A", ctx.GetVariable("A").(int)-1)
 }
 
 type bPassStep struct {
@@ -37,12 +37,12 @@ func (ps *bPassStep) DoAction(ctx *context) error {
 		return nil
 	}
 
-	ctx.SetVariable("B", fv.(int) + 1)
+	ctx.SetVariable("B", fv.(int)+1)
 	return nil
 }
 
 func (ps *bPassStep) UndoAction(ctx context) {
-	ctx.SetVariable("A", ctx.GetVariable("B").(int) - 1)
+	ctx.SetVariable("A", ctx.GetVariable("B").(int)-1)
 }
 
 func TestOrchestrator_Exec(t *testing.T) {
