@@ -1,17 +1,17 @@
 package orchestrator
 
-type  transitionState string
+type transitionState string
 
 const (
 	Main transitionState = "MAIN"
 	When transitionState = "WHEN"
 	Else transitionState = "ELSE"
-	End transitionState = "END"
+	End  transitionState = "END"
 
 	Condition int = 2
 	Default   int = 1
 
-	DefaultPrefix = "s_"
+	DefaultPrefix   = "s_"
 	ConditionPrefix = "sc_"
 	OtherwisePrefix = "sc!_"
 )
@@ -77,8 +77,8 @@ func (tss *stateStack) pop() predicateState {
 // newRoute define and return a transactionalRoute
 func newRoute() *transactionalRoute {
 	return &transactionalRoute{
-		counter: newCounter(),
-		state: Main,
+		counter:     newCounter(),
+		state:       Main,
 		statePrefix: DefaultPrefix,
 	}
 }
