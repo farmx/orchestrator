@@ -1,18 +1,35 @@
 package orchestrator
 
+type  transitionState string
+
 const (
+	Main transitionState = "MAIN"
+	When transitionState = "WHEN"
+	Else transitionState = "ELSE"
+	End transitionState = "END"
+
 	Condition int = 2
 	Default   int = 1
+
+	DefaultPrefix = "s_"
+	ConditionPrefix = "sc_"
+	OtherwisePrefix = "sc!_"
 )
 
 type (
-	route struct {
+	transactionalRoute struct {
 
 		// rootStates graph root state
 		rootStates *state
 
+		// route state
+		state transitionState
+
 		// latest added state
 		lastState *state
+
+		// state name prefix
+		statePrefix string
 
 		// conditionStateStack keep condition steps for otherwise/end-condition purpose
 		predicateStack stateStack
@@ -57,25 +74,38 @@ func (tss *stateStack) pop() predicateState {
 	return s
 }
 
-// newRoute define and return a route
-func newRoute() *route {
-	return &route{
+// newRoute define and return a transactionalRoute
+func newRoute() *transactionalRoute {
+	return &transactionalRoute{
 		counter: newCounter(),
+		state: Main,
+		statePrefix: DefaultPrefix,
 	}
 }
 
-// addNextStep add new step to route
-func (r *route) addNextStep(doAction func(ctx *context) error, undoAction func(ctx context)) *route {
+// addNextStep add new step to transactionalRoute
+func (r *transactionalRoute) addNextStep(doAction func(ctx *context) error, undoAction func(ctx context)) *transactionalRoute {
 	s := &state{
-		name:   "state_" + r.counter.next(),
+		name:   r.statePrefix + r.counter.next(),
 		action: r.defineAction(doAction, undoAction),
 	}
 
-	if r.rootStates == nil {
-		r.rootStates = s
-	}
+	switch r.state {
+	case When:
+		r.addNextStepAfterWhen(s)
+		break
+	case Else:
+		r.addNextStepAfterOtherwise(s)
+		break
+	case End:
+		r.addNextStepAfterEnd(s)
+		break
+	default:
+		if r.rootStates == nil {
+			r.rootStates = s
+			break
+		}
 
-	if r.lastState != nil {
 		r.defineTwoWayTransition(r.lastState, Default, func(ctx context) bool {
 			return ctx.GetVariable(SMStatusHeaderKey) != SMRollback
 		}, s)
@@ -83,39 +113,20 @@ func (r *route) addNextStep(doAction func(ctx *context) error, undoAction func(c
 
 	// update last state
 	r.lastState = s
+	r.state = Main
 	return r
 }
 
-// when to define a condition
-func (r *route) when(predicate func(ctx context) bool, doAction func(ctx *context) error, undoAction func(ctx context)) *route {
-	s := &state{
-		name:   "state_c_" + r.counter.subCount(),
-		action: r.defineAction(doAction, undoAction),
-	}
-
-	r.predicateStack.push(predicate, r.lastState)
-	r.defineTwoWayTransition(r.lastState, Condition, predicate, s)
-
-	// update last state
-	r.lastState = s
-	return r
+func (r *transactionalRoute) addNextStepAfterWhen(s *state) {
+	r.defineTwoWayTransition(r.lastState, Condition, r.predicateStack.getLast().predicate, s)
 }
 
-// otherwise when condition
-func (r *route) otherwise(doAction func(ctx *context) error, undoAction func(ctx context)) *route {
-	r.counter.endSubCounting()
-	s := &state{
-		name:   "state_!c_" + r.counter.subCount(),
-		action: r.defineAction(doAction, undoAction),
-	}
-
+func (r *transactionalRoute) addNextStepAfterOtherwise(s *state) {
 	ps := r.predicateStack.getLast()
+
 	r.defineTwoWayTransition(ps.state, Condition, func(ctx context) bool {
 		return !ps.predicate(ctx)
 	}, s)
-
-	r.lastState = s
-	return r
 }
 
 //        condition       condition
@@ -125,15 +136,7 @@ func (r *route) otherwise(doAction func(ctx *context) error, undoAction func(ctx
 //       \         /        |   /
 //        end state       end state
 
-// end of condition
-func (r *route) end(doAction func(ctx *context) error, undoAction func(ctx context)) *route {
-	r.counter.endSubCounting()
-
-	s := &state{
-		name:   "state_" + r.counter.next(),
-		action: r.defineAction(doAction, undoAction),
-	}
-
+func (r *transactionalRoute) addNextStepAfterEnd(s *state) {
 	predicate := func(ctx context) bool {
 		return true
 	}
@@ -151,16 +154,48 @@ func (r *route) end(doAction func(ctx *context) error, undoAction func(ctx conte
 		// define a transition from root condition state
 		r.defineTwoWayTransition(cs, Default, predicate, s)
 	}
+}
 
-	r.lastState = s
+// when to define a condition
+func (r *transactionalRoute) when(predicate func(ctx context) bool) *transactionalRoute {
+	r.state = When
+	r.predicateStack.push(predicate, r.lastState)
+
+	// state naming
+	r.statePrefix = ConditionPrefix
+	r.counter.subVersioning()
+
 	return r
 }
 
-func (r *route) getRouteStateMachine() *state {
+// otherwise when condition
+func (r *transactionalRoute) otherwise() *transactionalRoute {
+	r.state = Else
+
+	// state naming
+	r.statePrefix = OtherwisePrefix
+	r.counter.endSubVersioning()
+	r.counter.subVersioning()
+
+	return r
+}
+
+// end of condition
+func (r *transactionalRoute) end() *transactionalRoute {
+	r.state = End
+
+	// state naming
+	r.statePrefix = DefaultPrefix
+	r.counter.endSubVersioning()
+
+	return r
+}
+
+func (r *transactionalRoute) getRouteStateMachine() *state {
 	return r.rootStates
 }
 
-func (r *route) defineAction(doAction func(ctx *context) error, undoAction func(ctx context)) func(ctx *context) error {
+func (r *transactionalRoute) defineAction(doAction func(ctx *context) error, undoAction func(ctx context)) func(ctx *context) error {
 	return func(ctx *context) error {
 		if ctx.GetVariable(SMStatusHeaderKey) == SMRollback {
 			undoAction(*ctx)
@@ -171,7 +206,7 @@ func (r *route) defineAction(doAction func(ctx *context) error, undoAction func(
 	}
 }
 
-func (r *route) defineTwoWayTransition(src *state, priority int, predicate func(context) bool, dst *state) {
+func (r *transactionalRoute) defineTwoWayTransition(src *state, priority int, predicate func(context) bool, dst *state) {
 	// define a transition form src state to dst state
 	src.transitions = append(src.transitions, transition{
 		to:                   dst,
@@ -189,7 +224,7 @@ func (r *route) defineTwoWayTransition(src *state, priority int, predicate func(
 	})
 }
 
-func (r *route) getConditionalLastStates(root *state) []*state {
+func (r *transactionalRoute) getConditionalLastStates(root *state) []*state {
 	var result []*state
 	for _, tr := range root.transitions {
 		if tr.priority == Condition {

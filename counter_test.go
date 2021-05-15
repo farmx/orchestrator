@@ -14,13 +14,14 @@ func TestCounting(t *testing.T) {
 	r2 := c.next()
 	assert.Equal(t, "2", r2)
 
-	r3 := c.subCount()
+	c.subVersioning()
+	r3 := c.next()
 	assert.Equal(t, "2.1", r3)
 
 	r4 := c.next()
 	assert.Equal(t, "2.2", r4)
 
-	c.endSubCounting()
+	c.endSubVersioning()
 	r5 := c.next()
 	assert.Equal(t, "3", r5)
 }

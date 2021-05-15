@@ -6,19 +6,19 @@ import (
 	"log"
 )
 
-// Every route is created from multiple state those are connected with and edge
+// Every transactionalRoute is created from multiple state those are connected with and edge
 // Each edge has a priority and a condition
 // To go to the next step the edge sorted by priority and the first do-Action which comply with the condition called
 // In this scenario retry and backoff algorithm can be define as a edge which it's priority will be decrease with each time execution
-// Orchestrator handover context between registered route, based on their identifier
+// Orchestrator handover context between registered transactionalRoute, based on their identifier
 type orchestrator struct {
 	// registered routes
-	routes map[string]*route
+	routes map[string]*transactionalRoute
 
-	// latest define route
-	lr *route
+	// latest define transactionalRoute
+	lr *transactionalRoute
 
-	// route handler
+	// transactionalRoute handler
 	rh *routeHandler
 
 	ec chan error
@@ -31,13 +31,13 @@ type TransactionalStep interface {
 
 func NewOrchestrator() *orchestrator {
 	return &orchestrator{
-		routes: make(map[string]*route),
+		routes: make(map[string]*transactionalRoute),
 	}
 }
 
 func (o *orchestrator) From(from string) *orchestrator {
 	if o.routes[from] != nil {
-		log.Fatalf("duplicate route id %s", from)
+		log.Fatalf("duplicate transactionalRoute id %s", from)
 	}
 
 	o.routes[from] = newRoute()
@@ -51,20 +51,20 @@ func (o *orchestrator) AddStep(step TransactionalStep) *orchestrator {
 	return o
 }
 
-func (o *orchestrator) When(predicate func(ctx context) bool, step TransactionalStep) *orchestrator {
-	o.lr.when(predicate, step.DoAction, step.UndoAction)
+func (o *orchestrator) When(predicate func(ctx context) bool) *orchestrator {
+	o.lr.when(predicate)
 
 	return o
 }
 
-func (o *orchestrator) Otherwise(step TransactionalStep) *orchestrator {
-	o.lr.otherwise(step.DoAction, step.UndoAction)
+func (o *orchestrator) Otherwise() *orchestrator {
+	o.lr.otherwise()
 
 	return o
 }
 
-func (o *orchestrator) End(step TransactionalStep) *orchestrator {
-	o.lr.end(step.DoAction, step.UndoAction)
+func (o *orchestrator) End() *orchestrator {
+	o.lr.end()
 
 	return o
 }
@@ -92,7 +92,7 @@ func (o *orchestrator) notifier(ctx *context, endpoint string) error {
 
 func (o *orchestrator) Exec(from string, ctx *context, errCh chan error) {
 	if o.routes[from] == nil {
-		log.Fatalf("route does not exists")
+		log.Fatalf("transactionalRoute does not exists")
 	}
 
 	o.ec = errCh

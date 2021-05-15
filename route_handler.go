@@ -2,32 +2,32 @@ package orchestrator
 
 // TODO: define retry on each state as a transition
 
-type transactionStatus string
+type routeStatus string
 
 const (
-	InProgress transactionStatus = "IN_PROGRESS"
-	Success    transactionStatus = "SUCCESS"
-	Fail       transactionStatus = "FAIL"
+	InProgress routeStatus = "IN_PROGRESS"
+	Success    routeStatus = "SUCCESS"
+	Fail       routeStatus = "FAIL"
 )
 
 type routeHandler struct {
-	// route handler id
+	// transactionalRoute handler id
 	id string
 
-	// action route root state
+	// action transactionalRoute root state
 	routeRootState *state
 
-	// recovery route root state
+	// recovery transactionalRoute root state
 	recoveryRootState *state
 
 	// statemachine ...
 	statemachine *statemachine
 
-	// route transaction execution status
-	status transactionStatus
+	// transactionalRoute transaction execution status
+	status routeStatus
 }
 
-// route is root state
+// transactionalRoute is root state
 func newRouteHandler(routeRootState *state, recoveryRootState *state) *routeHandler {
 	return &routeHandler{
 		routeRootState:    routeRootState,
@@ -54,7 +54,7 @@ func (rh *routeHandler) exec(ctx *context, errCh chan<- error) {
 		if rh.recoveryRootState != nil {
 			rh.statemachine.init(rh.recoveryRootState, &mctx)
 
-			// skip recovery route error
+			// skip recovery transactionalRoute error
 			for rh.statemachine.hastNext() {
 				_ = rh.statemachine.next()
 			}

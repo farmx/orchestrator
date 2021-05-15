@@ -53,10 +53,10 @@ func TestOrchestrator_Exec(t *testing.T) {
 	orch.
 		From(aRoute).
 		AddStep(&passStep{}).
-		When(func(ctx context) bool {
-			return true
-		}, &passStep{}).To(bRoute).
-		End(&passStep{})
+		When(func(ctx context) bool {return true}).
+			AddStep(&passStep{}).To(bRoute).
+		End().
+		AddStep(&passStep{})
 
 	orch.From(bRoute).AddStep(&bPassStep{})
 

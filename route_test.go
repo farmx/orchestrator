@@ -45,8 +45,8 @@ func TestDefineConditionalRoute(t *testing.T) {
 	r := newRoute().
 		addNextStep(doActionTest, undoActionTest).
 		addNextStep(doActionTest, undoActionTest).
-		when(func(ctx context) bool { return true },
-			doActionTest, undoActionTest).
+		when(func(ctx context) bool { return true }).
+		addNextStep(doActionTest, undoActionTest).
 		addNextStep(doActionTest, undoActionTest).
 		addNextStep(doActionTest, undoActionTest)
 
@@ -57,8 +57,8 @@ func TestDefineConditionalRoute(t *testing.T) {
 	rf := newRoute().
 		addNextStep(doActionTest, undoActionTest).
 		addNextStep(doActionTest, undoActionTest).
-		when(func(ctx context) bool { return false },
-			doActionTest, undoActionTest).
+		when(func(ctx context) bool { return false }).
+		addNextStep(doActionTest, undoActionTest).
 		addNextStep(doActionTest, undoActionTest).
 		addNextStep(doActionTest, undoActionTest)
 
@@ -71,10 +71,10 @@ func TestDefineNestedConditionalRoute(t *testing.T) {
 	r := newRoute().
 		addNextStep(doActionTest, undoActionTest).
 		addNextStep(doActionTest, undoActionTest).
-		when(func(ctx context) bool { return true },
-			doActionTest, undoActionTest).
-		when(func(ctx context) bool { return true },
-			doActionTest, undoActionTest).
+		when(func(ctx context) bool { return true }).
+		addNextStep(doActionTest, undoActionTest).
+		when(func(ctx context) bool { return true }).
+		addNextStep(doActionTest, undoActionTest).
 		addNextStep(doActionTest, undoActionTest).
 		addNextStep(doActionTest, undoActionTest)
 
@@ -87,10 +87,11 @@ func TestDefineConditionWithOtherwiseRoute(t *testing.T) {
 	r := newRoute().
 		addNextStep(doActionTest, undoActionTest).
 		addNextStep(doActionTest, undoActionTest).
-		when(func(ctx context) bool { return true },
-			doActionTest, undoActionTest).
+		when(func(ctx context) bool { return true }).
 		addNextStep(doActionTest, undoActionTest).
-		otherwise(doActionTest, undoActionTest).
+		addNextStep(doActionTest, undoActionTest).
+		otherwise().
+		addNextStep(doActionTest, undoActionTest).
 		addNextStep(doActionTest, undoActionTest).
 		addNextStep(doActionTest, undoActionTest)
 
@@ -103,9 +104,10 @@ func TestDefineConditionWithOtherwiseAndEndRoute(t *testing.T) {
 	r := newRoute().
 		addNextStep(doActionTest, undoActionTest).
 		addNextStep(doActionTest, undoActionTest).
-		when(func(ctx context) bool { return false },
-			doActionTest, undoActionTest).
-		otherwise(doActionTest, undoActionTest).
+		when(func(ctx context) bool { return false }).
+		addNextStep(doActionTest, undoActionTest).
+		otherwise().
+		addNextStep(doActionTest, undoActionTest).
 		addNextStep(doActionTest, undoActionTest).
 		addNextStep(doActionTest, undoActionTest)
 
@@ -117,11 +119,13 @@ func TestDefineConditionWithOtherwiseAndEndRoute(t *testing.T) {
 func TestDefineRoute(t *testing.T) {
 	r := newRoute().
 		addNextStep(doActionTest, undoActionTest).
-		when(func(ctx context) bool { return true },
-			doActionTest, undoActionTest).
+		when(func(ctx context) bool { return true }).
 		addNextStep(doActionTest, undoActionTest).
-		otherwise(doActionTest, undoActionTest).
-		end(doActionTest, undoActionTest)
+		addNextStep(doActionTest, undoActionTest).
+		otherwise().
+		addNextStep(doActionTest, undoActionTest).
+		end().
+		addNextStep(doActionTest, undoActionTest)
 
 	rh := execTestRoute(r.getRouteStateMachine())
 

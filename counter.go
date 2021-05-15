@@ -26,13 +26,11 @@ func (c *counter) next() string {
 	return cr
 }
 
-func (c *counter) subCount() string {
+func (c *counter) subVersioning() {
 	c.versions = append(c.versions, 0)
-
-	return c.next()
 }
 
-func (c *counter) endSubCounting() {
+func (c *counter) endSubVersioning() {
 	lenv := len(c.versions)
 	c.versions = c.versions[:lenv-1]
 }
