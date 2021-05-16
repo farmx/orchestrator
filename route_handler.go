@@ -1,6 +1,6 @@
 package orchestrator
 
-// TODO: define retry on each state as a transition
+// TODO: define retry on each State as a transition
 
 type routeStatus string
 
@@ -10,60 +10,59 @@ const (
 	Fail       routeStatus = "FAIL"
 )
 
-type routeHandler struct {
-	// transactionalRoute handler id
+type routeRunner struct {
+	// TransactionalRoute handler id
 	id string
 
-	// action transactionalRoute root state
+	// action TransactionalRoute root state
 	routeRootState *state
 
-	// recovery transactionalRoute root state
+	// recovery TransactionalRoute root state
 	recoveryRootState *state
 
 	// statemachine ...
 	statemachine *statemachine
 
-	// transactionalRoute transaction execution status
+	// TransactionalRoute transaction execution status
 	status routeStatus
 }
 
-// transactionalRoute is root state
-func newRouteHandler(routeRootState *state, recoveryRootState *state) *routeHandler {
-	return &routeHandler{
+func newRouteRunner(routeRootState *state, recoveryRootState *state) *routeRunner {
+	return &routeRunner{
 		routeRootState:    routeRootState,
 		recoveryRootState: recoveryRootState,
 		statemachine:      &statemachine{},
 	}
 }
 
-func (rh *routeHandler) exec(ctx *context, errCh chan<- error) {
-	rh.statemachine.init(rh.routeRootState, ctx)
-	rh.status = InProgress
+func (rr *routeRunner) exec(ctx *context, errCh chan<- error) {
+	rr.statemachine.init(rr.routeRootState, ctx)
+	rr.status = InProgress
 
-	for rh.statemachine.hastNext() {
-		err := rh.statemachine.next()
-		mst, mctx := rh.statemachine.getMemento()
+	for rr.statemachine.hastNext() {
+		err := rr.statemachine.next()
+		mst, mctx := rr.statemachine.getMemento()
 
 		if err == nil {
 			continue
 		}
 
-		rh.status = Fail
+		rr.status = Fail
 		errCh <- err
 
-		if rh.recoveryRootState != nil {
-			rh.statemachine.init(rh.recoveryRootState, &mctx)
+		if rr.recoveryRootState != nil {
+			rr.statemachine.init(rr.recoveryRootState, &mctx)
 
-			// skip recovery transactionalRoute error
-			for rh.statemachine.hastNext() {
-				_ = rh.statemachine.next()
+			// skip recovery TransactionalRoute error
+			for rr.statemachine.hastNext() {
+				_ = rr.statemachine.next()
 			}
 
-			rh.statemachine.init(mst, &mctx)
+			rr.statemachine.init(mst, &mctx)
 		}
 	}
 
-	if rh.status != Fail {
-		rh.status = Success
+	if rr.status != Fail {
+		rr.status = Success
 	}
 }

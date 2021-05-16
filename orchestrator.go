@@ -4,22 +4,20 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"reflect"
 )
 
-// Every transactionalRoute is created from multiple state those are connected with and edge
+// Every TransactionalRoute is created from multiple state those are connected with and edge
 // Each edge has a priority and a condition
 // To go to the next step the edge sorted by priority and the first do-Action which comply with the condition called
 // In this scenario retry and backoff algorithm can be define as a edge which it's priority will be decrease with each time execution
-// Orchestrator handover context between registered transactionalRoute, based on their identifier
+// Orchestrator handover context between registered TransactionalRoute, based on their identifier
 type orchestrator struct {
 	// registered routes
-	routes map[string]*transactionalRoute
+	routes map[string]Route
 
-	// latest define transactionalRoute
-	lr *transactionalRoute
-
-	// transactionalRoute handler
-	rh *routeHandler
+	// TransactionalRoute handler
+	rh *routeRunner
 
 	ec chan error
 }
@@ -31,72 +29,61 @@ type TransactionalStep interface {
 
 func NewOrchestrator() *orchestrator {
 	return &orchestrator{
-		routes: make(map[string]*transactionalRoute),
+		routes: make(map[string]Route),
 	}
 }
 
-func (o *orchestrator) From(from string) *orchestrator {
-	if o.routes[from] != nil {
-		log.Fatalf("duplicate transactionalRoute id %s", from)
+func (o *orchestrator) register(id string, r Route) error {
+	if o.routes[id] != nil {
+		return errors.New(fmt.Sprintf("duplicate route id %s", id))
 	}
 
-	o.routes[from] = newRoute()
-	o.lr = o.routes[from]
-	return o
+	o.routes[id] = r
+	return nil
 }
 
-func (o *orchestrator) AddStep(step TransactionalStep) *orchestrator {
-	o.lr.addNextStep(step.DoAction, step.UndoAction)
+func (o *orchestrator) execPreparation() error {
+	for _, s := range o.routes {
+		for _, e := range s.GetEndpoints() {
+			if o.routes[e.To] == nil {
+				return errors.New(fmt.Sprintf("route id %s not found", e.To))
+			}
 
-	return o
-}
+			e.State.transitions = append(e.State.transitions, transition{
+				to:       o.routes[e.To].GetStartState(),
+				priority: Default,
+				shouldTakeTransition: func(ctx context) bool {
+					return true
+				},
+			})
 
-func (o *orchestrator) When(predicate func(ctx context) bool) *orchestrator {
-	o.lr.when(predicate)
-
-	return o
-}
-
-func (o *orchestrator) Otherwise() *orchestrator {
-	o.lr.otherwise()
-
-	return o
-}
-
-func (o *orchestrator) End() *orchestrator {
-	o.lr.end()
-
-	return o
-}
-
-func (o *orchestrator) To(to string) *orchestrator {
-	o.lr.addNextStep(func(ctx *context) error {
-		return o.notifier(ctx, to)
-	}, func(ctx context) {
-		// empty
-	})
-
-	return o
-}
-
-func (o *orchestrator) notifier(ctx *context, endpoint string) error {
-	if o.routes[endpoint] == nil {
-		return errors.New(fmt.Sprintf("endpoint %s does not exits", endpoint))
+			// transaction support
+			if reflect.TypeOf(o.routes[e.To]).String() == "TransactionalRoute" {
+				o.routes[e.To].GetStartState().transitions = append(o.routes[e.To].GetStartState().transitions, transition{
+					to:       e.State,
+					priority: Default,
+					shouldTakeTransition: func(ctx context) bool {
+						return ctx.GetVariable(SMStatusHeaderKey) == SMRollback
+					},
+				})
+			}
+		}
 	}
-
-	o.rh = newRouteHandler(o.routes[endpoint].getRouteStateMachine(), nil)
-	o.rh.exec(ctx, o.ec)
 
 	return nil
 }
 
 func (o *orchestrator) Exec(from string, ctx *context, errCh chan error) {
 	if o.routes[from] == nil {
-		log.Fatalf("transactionalRoute does not exists")
+		log.Fatalf("route %s not found", from)
+	}
+
+	if err := o.execPreparation(); err != nil {
+		log.Fatalf(err.Error())
 	}
 
 	o.ec = errCh
-	rh := newRouteHandler(o.routes[from].getRouteStateMachine(), nil)
+	rh := newRouteRunner(o.routes[from].GetStartState(), nil)
 
 	rh.exec(ctx, o.ec)
 }

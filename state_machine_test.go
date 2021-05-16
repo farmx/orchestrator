@@ -10,14 +10,14 @@ import (
 func TestHappyScenario(t *testing.T) {
 	state1 := &state{
 		action: func(ctx *context) error {
-			log.Print("state 1 action")
+			log.Print("State 1 action")
 			return nil
 		},
 	}
 
 	state2 := &state{
 		action: func(ctx *context) error {
-			log.Print("state 2 action")
+			log.Print("State 2 action")
 			return nil
 		},
 	}
@@ -60,14 +60,14 @@ func TestRollback(t *testing.T) {
 				return nil
 			}
 
-			log.Print("state 1 action")
+			log.Print("State 1 action")
 			return nil
 		},
 	}
 
 	state2 := &state{
 		action: func(ctx *context) error {
-			log.Print("state 2 action")
+			log.Print("State 2 action")
 			return errors.New("fake error")
 		},
 	}
@@ -126,14 +126,14 @@ func TestLoop(t *testing.T) {
 			}
 
 			ctx.SetVariable(headerKey, ctx.GetVariable(headerKey).(int)+1)
-			log.Print("state 1 action")
+			log.Print("State 1 action")
 			return nil
 		},
 	}
 
 	state2 := &state{
 		action: func(ctx *context) error {
-			log.Print("state 2 action")
+			log.Print("State 2 action")
 			return nil
 		},
 	}
@@ -188,7 +188,7 @@ func TestComplexCondition(t *testing.T) {
 	state1 := &state{
 		name: "state_1",
 		action: func(ctx *context) error {
-			log.Print("state 1 action")
+			log.Print("State 1 action")
 			return nil
 		},
 	}
@@ -196,7 +196,7 @@ func TestComplexCondition(t *testing.T) {
 	state2 := &state{
 		name: "state_2",
 		action: func(ctx *context) error {
-			log.Print("state 2 action")
+			log.Print("State 2 action")
 			return nil
 		},
 	}
@@ -204,7 +204,7 @@ func TestComplexCondition(t *testing.T) {
 	state3 := &state{
 		name: "state_3",
 		action: func(ctx *context) error {
-			log.Print("state 3 action")
+			log.Print("State 3 action")
 			return nil
 		},
 	}
@@ -212,7 +212,7 @@ func TestComplexCondition(t *testing.T) {
 	state4 := &state{
 		name: "state_4",
 		action: func(ctx *context) error {
-			log.Print("state 4 action")
+			log.Print("State 4 action")
 			return nil
 		},
 	}
@@ -220,7 +220,7 @@ func TestComplexCondition(t *testing.T) {
 	state5 := &state{
 		name: "state_5",
 		action: func(ctx *context) error {
-			log.Print("state 5 action")
+			log.Print("State 5 action")
 			return nil
 		},
 	}

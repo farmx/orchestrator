@@ -5,11 +5,7 @@ import (
 	"testing"
 )
 
-type passStep struct {
-	TransactionalStep
-}
-
-func (ps *passStep) DoAction(ctx *context) error {
+func doActionA(ctx *context) error {
 	fv := ctx.GetVariable("A")
 
 	if fv == nil {
@@ -21,7 +17,7 @@ func (ps *passStep) DoAction(ctx *context) error {
 	return nil
 }
 
-func (ps *passStep) UndoAction(ctx context) {
+func undoActionA(ctx context) {
 	ctx.SetVariable("A", ctx.GetVariable("A").(int)-1)
 }
 
@@ -29,7 +25,7 @@ type bPassStep struct {
 	TransactionalStep
 }
 
-func (ps *bPassStep) DoAction(ctx *context) error {
+func doActionB(ctx *context) error {
 	fv := ctx.GetVariable("B")
 
 	if fv == nil {
@@ -41,7 +37,7 @@ func (ps *bPassStep) DoAction(ctx *context) error {
 	return nil
 }
 
-func (ps *bPassStep) UndoAction(ctx context) {
+func undoActionB(ctx context) {
 	ctx.SetVariable("A", ctx.GetVariable("B").(int)-1)
 }
 
@@ -50,17 +46,18 @@ func TestOrchestrator_Exec(t *testing.T) {
 	bRoute := "B_ROUTE"
 
 	orch := NewOrchestrator()
-	orch.
-		From(aRoute).
-		AddStep(&passStep{}).
+	ar := newTransactionalRoute().
+		AddNextStep(doActionA, undoActionA).
 		When(func(ctx context) bool { return true }).
-		AddStep(&passStep{}).To(bRoute).
+		AddNextStep(doActionA, undoActionA).To(bRoute).
 		End().
-		AddStep(&passStep{})
+		AddNextStep(doActionA, undoActionA)
 
-	orch.From(bRoute).AddStep(&bPassStep{})
+	br := newTransactionalRoute().AddNextStep(doActionB, undoActionB)
 
 	ctx, _ := NewContext()
+	orch.register(aRoute, ar)
+	orch.register(bRoute, br)
 	orch.Exec(aRoute, ctx, nil)
 
 	assert.Equal(t, 2, ctx.GetVariable("A"))
