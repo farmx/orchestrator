@@ -7,8 +7,7 @@ the main functionality:
 - [X] Support Transactional/Non-Transactional operation flow
 - [X] Error handling
 - [X] Hierarchical statemachine
-- [ ] Restore system last state at warm-up
-- [ ] graceful shutdown
+- [X] Customizable error handling
 
 Not support
 - Load balancing
