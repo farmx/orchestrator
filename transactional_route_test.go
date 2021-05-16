@@ -5,10 +5,6 @@ import (
 	"testing"
 )
 
-type alwaysPassTransactionMock struct {
-	TransactionalStep
-}
-
 func doActionTest(ctx *context) error {
 	if ctx.GetVariable("HK") == nil {
 		ctx.SetVariable("HK", 0)
@@ -31,7 +27,7 @@ func execTestRoute(route *state) *routeRunner {
 }
 
 func TestDefineUnconditionalRoute(t *testing.T) {
-	r := newTransactionalRoute().
+	r := NewTransactionalRoute("TEST_ROUTE").
 		AddNextStep(doActionTest, undoActionTest).
 		AddNextStep(doActionTest, undoActionTest).
 		AddNextStep(doActionTest, undoActionTest)
@@ -42,7 +38,7 @@ func TestDefineUnconditionalRoute(t *testing.T) {
 }
 
 func TestDefineConditionalRoute(t *testing.T) {
-	r := newTransactionalRoute().
+	r := NewTransactionalRoute("TEST_ROUTE").
 		AddNextStep(doActionTest, undoActionTest).
 		AddNextStep(doActionTest, undoActionTest).
 		When(func(ctx context) bool { return true }).
@@ -54,7 +50,7 @@ func TestDefineConditionalRoute(t *testing.T) {
 
 	assert.Equal(t, 5, rh.statemachine.context.GetVariable("HK"))
 
-	rf := newTransactionalRoute().
+	rf := NewTransactionalRoute("TEST_ROUTE").
 		AddNextStep(doActionTest, undoActionTest).
 		AddNextStep(doActionTest, undoActionTest).
 		When(func(ctx context) bool { return false }).
@@ -68,7 +64,7 @@ func TestDefineConditionalRoute(t *testing.T) {
 }
 
 func TestDefineNestedConditionalRoute(t *testing.T) {
-	r := newTransactionalRoute().
+	r := NewTransactionalRoute("TEST_ROUTE").
 		AddNextStep(doActionTest, undoActionTest).
 		AddNextStep(doActionTest, undoActionTest).
 		When(func(ctx context) bool { return true }).
@@ -84,7 +80,7 @@ func TestDefineNestedConditionalRoute(t *testing.T) {
 }
 
 func TestDefineConditionWithOtherwiseRoute(t *testing.T) {
-	r := newTransactionalRoute().
+	r := NewTransactionalRoute("TEST_ROUTE").
 		AddNextStep(doActionTest, undoActionTest).
 		AddNextStep(doActionTest, undoActionTest).
 		When(func(ctx context) bool { return true }).
@@ -101,7 +97,7 @@ func TestDefineConditionWithOtherwiseRoute(t *testing.T) {
 }
 
 func TestDefineConditionWithOtherwiseAndEndRoute(t *testing.T) {
-	r := newTransactionalRoute().
+	r := NewTransactionalRoute("TEST_ROUTE").
 		AddNextStep(doActionTest, undoActionTest).
 		AddNextStep(doActionTest, undoActionTest).
 		When(func(ctx context) bool { return false }).
@@ -117,7 +113,7 @@ func TestDefineConditionWithOtherwiseAndEndRoute(t *testing.T) {
 }
 
 func TestDefineRoute(t *testing.T) {
-	r := newTransactionalRoute().
+	r := NewTransactionalRoute("TEST_ROUTE").
 		AddNextStep(doActionTest, undoActionTest).
 		When(func(ctx context) bool { return true }).
 		AddNextStep(doActionTest, undoActionTest).

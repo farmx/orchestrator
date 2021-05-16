@@ -1,5 +1,7 @@
 package orchestrator
 
+import "fmt"
+
 type transitionState string
 
 const (
@@ -11,13 +13,15 @@ const (
 	Condition int = 2
 	Default   int = 1
 
-	DefaultPrefix   = "s_"
-	ConditionPrefix = "sc_"
-	OtherwisePrefix = "sc!_"
+	DefaultPrefix   = "s"
+	ConditionPrefix = "sc"
+	OtherwisePrefix = "sc!"
 )
 
 type (
 	TransactionalRoute struct {
+		// route id
+		id string
 
 		// startState graph root state
 		startState *state
@@ -81,9 +85,10 @@ func (tss *stateStack) pop() predicateState {
 	return s
 }
 
-// newTransactionalRoute define and return a TransactionalRoute
-func newTransactionalRoute() *TransactionalRoute {
+// NewTransactionalRoute define and return a TransactionalRoute
+func NewTransactionalRoute(id string) *TransactionalRoute {
 	return &TransactionalRoute{
+		id:          id,
 		counter:     newCounter(),
 		state:       Main,
 		statePrefix: DefaultPrefix,
@@ -93,7 +98,7 @@ func newTransactionalRoute() *TransactionalRoute {
 // AddNextStep add new step to TransactionalRoute
 func (tr *TransactionalRoute) AddNextStep(doAction func(ctx *context) error, undoAction func(ctx context)) *TransactionalRoute {
 	s := &state{
-		name:   tr.statePrefix + tr.counter.next(),
+		name:   fmt.Sprintf("%s_%s_%s", tr.id, tr.statePrefix, tr.counter.next()),
 		action: tr.defineAction(doAction, undoAction),
 	}
 
@@ -207,6 +212,10 @@ func (tr *TransactionalRoute) To(id string) *TransactionalRoute {
 	return tr
 }
 
+func (tr *TransactionalRoute) GetRouteId() string {
+	return tr.id
+}
+
 func (tr *TransactionalRoute) GetStartState() *state {
 	return tr.startState
 }
@@ -229,9 +238,11 @@ func (tr *TransactionalRoute) defineAction(doAction func(ctx *context) error, un
 func (tr *TransactionalRoute) defineTwoWayTransition(src *state, priority int, predicate func(context) bool, dst *state) {
 	// define a transition form src State to dst State
 	src.transitions = append(src.transitions, transition{
-		to:                   dst,
-		priority:             priority,
-		shouldTakeTransition: predicate,
+		to:       dst,
+		priority: priority,
+		shouldTakeTransition: func(ctx context) bool {
+			return predicate(ctx) && ctx.GetVariable(SMStatusHeaderKey) != SMRollback
+		},
 	})
 
 	// define a transition from dst to src State for rollback

@@ -12,19 +12,40 @@ import (
 // To go to the next step the edge sorted by priority and the first do-Action which comply with the condition called
 // In this scenario retry and backoff algorithm can be define as a edge which it's priority will be decrease with each time execution
 // Orchestrator handover context between registered TransactionalRoute, based on their identifier
-type orchestrator struct {
-	// registered routes
-	routes map[string]Route
 
-	// TransactionalRoute handler
-	rh *routeRunner
+const DefaultRecoveryRouteId = "RECOVERY_ROUTE"
 
-	ec chan error
+type (
+	orchestrator struct {
+		// registered routes
+		routes map[string]Route
+
+		// TransactionalRoute handler
+		rh *routeRunner
+
+		ec chan error
+	}
+
+	defaultRecoveryRoute struct {
+	}
+)
+
+func (drr *defaultRecoveryRoute) GetRouteId() string {
+	return "RECOVERY_ROUTE"
 }
 
-type TransactionalStep interface {
-	DoAction(ctx *context) error
-	UndoAction(ctx context)
+func (drr *defaultRecoveryRoute) GetStartState() *state {
+	return &state{
+		name:        "default_recovery_state",
+		transitions: nil,
+		action: func(ctx *context) error {
+			return nil
+		},
+	}
+}
+
+func (drr *defaultRecoveryRoute) GetEndpoints() []*Endpoint {
+	return nil
 }
 
 func NewOrchestrator() *orchestrator {
@@ -33,16 +54,16 @@ func NewOrchestrator() *orchestrator {
 	}
 }
 
-func (o *orchestrator) register(id string, r Route) error {
-	if o.routes[id] != nil {
-		return errors.New(fmt.Sprintf("duplicate route id %s", id))
+func (o *orchestrator) Register(r Route) error {
+	if o.routes[r.GetRouteId()] != nil {
+		return errors.New(fmt.Sprintf("duplicate route id %s", r.GetRouteId()))
 	}
 
-	o.routes[id] = r
+	o.routes[r.GetRouteId()] = r
 	return nil
 }
 
-func (o *orchestrator) execPreparation() error {
+func (o *orchestrator) defineHierarchicalRouteTransitions() error {
 	for _, s := range o.routes {
 		for _, e := range s.GetEndpoints() {
 			if o.routes[e.To] == nil {
@@ -57,8 +78,7 @@ func (o *orchestrator) execPreparation() error {
 				},
 			})
 
-			// transaction support
-			if reflect.TypeOf(o.routes[e.To]).String() == "TransactionalRoute" {
+			if reflect.TypeOf(o.routes[e.To]) == reflect.TypeOf(&TransactionalRoute{}) {
 				o.routes[e.To].GetStartState().transitions = append(o.routes[e.To].GetStartState().transitions, transition{
 					to:       e.State,
 					priority: Default,
@@ -73,17 +93,39 @@ func (o *orchestrator) execPreparation() error {
 	return nil
 }
 
+// "RECOVERY_ROUTE" reserved route id for recovery route
+func (o *orchestrator) defineRecoveryRoute(route Route) error {
+	r := route
+
+	if route == nil {
+		r = &defaultRecoveryRoute{}
+	}
+
+	if r.GetRouteId() != DefaultRecoveryRouteId {
+		return errors.New("recovery route id is not 'RECOVERY_ROUTE'")
+	}
+
+	o.routes[DefaultRecoveryRouteId] = r
+	return nil
+}
+
+func (o *orchestrator) Initialization(recoveryRoute Route) error {
+	if err := o.defineRecoveryRoute(recoveryRoute); err != nil {
+		return err
+	}
+
+	return o.defineHierarchicalRouteTransitions()
+}
+
+// Exec connect all endpoints to the proper route according to the route id with a transition
+// from is the starter route id
 func (o *orchestrator) Exec(from string, ctx *context, errCh chan error) {
 	if o.routes[from] == nil {
 		log.Fatalf("route %s not found", from)
 	}
 
-	if err := o.execPreparation(); err != nil {
-		log.Fatalf(err.Error())
-	}
-
 	o.ec = errCh
-	rh := newRouteRunner(o.routes[from].GetStartState(), nil)
+	rh := newRouteRunner(o.routes[from].GetStartState(), o.routes[DefaultRecoveryRouteId].GetStartState())
 
 	rh.exec(ctx, o.ec)
 }

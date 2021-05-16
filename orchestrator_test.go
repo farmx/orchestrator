@@ -1,65 +1,107 @@
 package orchestrator
 
 import (
+	"errors"
 	"github.com/stretchr/testify/assert"
+	"log"
 	"testing"
 )
 
-func doActionA(ctx *context) error {
-	fv := ctx.GetVariable("A")
-
-	if fv == nil {
-		ctx.SetVariable("A", 1)
-		return nil
-	}
-
-	ctx.SetVariable("A", fv.(int)+1)
-	return nil
-}
-
-func undoActionA(ctx context) {
-	ctx.SetVariable("A", ctx.GetVariable("A").(int)-1)
-}
-
-type bPassStep struct {
-	TransactionalStep
-}
-
-func doActionB(ctx *context) error {
-	fv := ctx.GetVariable("B")
-
-	if fv == nil {
-		ctx.SetVariable("B", 1)
-		return nil
-	}
-
-	ctx.SetVariable("B", fv.(int)+1)
-	return nil
-}
-
-func undoActionB(ctx context) {
-	ctx.SetVariable("A", ctx.GetVariable("B").(int)-1)
-}
-
-func TestOrchestrator_Exec(t *testing.T) {
+func TestOrchestrator_Exec_HandoverBetweenRoutes(t *testing.T) {
 	aRoute := "A_ROUTE"
 	bRoute := "B_ROUTE"
 
-	orch := NewOrchestrator()
-	ar := newTransactionalRoute().
-		AddNextStep(doActionA, undoActionA).
-		When(func(ctx context) bool { return true }).
-		AddNextStep(doActionA, undoActionA).To(bRoute).
-		End().
-		AddNextStep(doActionA, undoActionA)
+	daa := func(ctx *context) error {
+		fv := ctx.GetVariable("A")
 
-	br := newTransactionalRoute().AddNextStep(doActionB, undoActionB)
+		if fv == nil {
+			ctx.SetVariable("A", 1)
+			return nil
+		}
+
+		ctx.SetVariable("A", fv.(int)+1)
+		return nil
+	}
+
+	uaa := func(ctx context) {
+		ctx.SetVariable("A", ctx.GetVariable("A").(int)-1)
+	}
+
+	dab := func(ctx *context) error {
+		fv := ctx.GetVariable("B")
+
+		if fv == nil {
+			ctx.SetVariable("B", 1)
+			return nil
+		}
+
+		ctx.SetVariable("B", fv.(int)+1)
+		return nil
+	}
+
+	uab := func(ctx context) {
+		ctx.SetVariable("A", ctx.GetVariable("B").(int)-1)
+	}
+
+	orch := NewOrchestrator()
+	ar := NewTransactionalRoute(aRoute).
+		AddNextStep(daa, uaa).
+		When(func(ctx context) bool { return true }).
+		AddNextStep(daa, uaa).To(bRoute).
+		End().
+		AddNextStep(daa, uaa)
+
+	br := NewTransactionalRoute(bRoute).AddNextStep(dab, uab)
 
 	ctx, _ := NewContext()
-	orch.register(aRoute, ar)
-	orch.register(bRoute, br)
+	_ = orch.Register(ar)
+	_ = orch.Register(br)
+
+	_ = orch.Initialization(nil)
 	orch.Exec(aRoute, ctx, nil)
 
 	assert.Equal(t, 2, ctx.GetVariable("A"))
 	assert.Equal(t, 1, ctx.GetVariable("B"))
+}
+
+func TestOrchestrator_Exec_RollbackBetweenTransactionalRoute(t *testing.T) {
+	aRoute := "A_ROUTE"
+	bRoute := "B_ROUTE"
+
+	daa := func(ctx *context) error {
+		ctx.SetVariable("STATE", "DAA")
+		return nil
+	}
+
+	uaa := func(ctx context) {
+		log.Print("UAA")
+	}
+
+	dab := func(ctx *context) error {
+
+		ctx.SetVariable("STATE", "UAB")
+		return errors.New("fake error")
+	}
+
+	uab := func(ctx context) {
+		log.Print("UAB")
+	}
+
+	errChan := make(chan error)
+	go func() {
+		for err := range errChan {
+			assert.NotNil(t, err)
+		}
+	}()
+
+	orch := NewOrchestrator()
+	ar := NewTransactionalRoute(aRoute).AddNextStep(daa, uaa).To(bRoute)
+	br := NewTransactionalRoute(bRoute).AddNextStep(dab, uab)
+
+	ctx, _ := NewContext()
+	_ = orch.Register(ar)
+	_ = orch.Register(br)
+
+	_ = orch.Initialization(nil)
+	orch.Exec(aRoute, ctx, errChan)
 }
