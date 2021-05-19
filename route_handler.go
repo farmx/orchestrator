@@ -1,7 +1,5 @@
 package orchestrator
 
-// TODO: define retry on each State as a transition
-
 type routeStatus string
 
 const (

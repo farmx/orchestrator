@@ -4,8 +4,6 @@ import "sort"
 
 type statemachineStatus string
 
-// TODO: Separate service and application context to avoid SM status unwanted change with actions
-
 const (
 	SMStatusHeaderKey string = "SM_STATUS"
 
