@@ -3,7 +3,7 @@ package orchestrator
 type (
 	Route interface {
 		GetRouteId() string
-		GetStartState() *state
+		GetStartState() *State
 		GetEndpoints() []*Endpoint
 	}
 
@@ -12,6 +12,6 @@ type (
 		To string
 
 		// State endpoint
-		State *state
+		State *State
 	}
 )

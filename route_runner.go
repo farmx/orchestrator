@@ -4,19 +4,18 @@ type routeStatus string
 
 const (
 	InProgress routeStatus = "IN_PROGRESS"
-	Success    routeStatus = "SUCCESS"
-	Fail       routeStatus = "FAIL"
+	Done       routeStatus = "DONE"
 )
 
 type routeRunner struct {
 	// TransactionalRoute handler id
 	id string
 
-	// action TransactionalRoute root state
-	routeRootState *state
+	// action TransactionalRoute root State
+	routeRootState *State
 
-	// recovery TransactionalRoute root state
-	recoveryRootState *state
+	// recovery TransactionalRoute root State
+	recoveryRootState *State
 
 	// statemachine ...
 	statemachine *statemachine
@@ -25,7 +24,7 @@ type routeRunner struct {
 	status routeStatus
 }
 
-func newRouteRunner(routeRootState *state, recoveryRootState *state) *routeRunner {
+func newRouteRunner(routeRootState *State, recoveryRootState *State) *routeRunner {
 	return &routeRunner{
 		routeRootState:    routeRootState,
 		recoveryRootState: recoveryRootState,
@@ -33,7 +32,7 @@ func newRouteRunner(routeRootState *state, recoveryRootState *state) *routeRunne
 	}
 }
 
-func (rr *routeRunner) exec(ctx *context, errCh chan<- error) {
+func (rr *routeRunner) run(ctx *context, errCh chan<- error) {
 	rr.statemachine.init(rr.routeRootState, ctx)
 	rr.status = InProgress
 
@@ -45,7 +44,6 @@ func (rr *routeRunner) exec(ctx *context, errCh chan<- error) {
 			continue
 		}
 
-		rr.status = Fail
 		errCh <- err
 
 		if rr.recoveryRootState != nil {
@@ -60,7 +58,9 @@ func (rr *routeRunner) exec(ctx *context, errCh chan<- error) {
 		}
 	}
 
-	if rr.status != Fail {
-		rr.status = Success
-	}
+	rr.status = Done
+}
+
+func (rr *routeRunner) shutdown() {
+
 }

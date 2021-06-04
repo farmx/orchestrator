@@ -7,7 +7,7 @@ import (
 	"reflect"
 )
 
-// Every TransactionalRoute is created from multiple state those are connected with and edge
+// Every TransactionalRoute is created from multiple State those are connected with and edge
 // Each edge has a priority and a condition
 // To go to the next step the edge sorted by priority and the first do-Action which comply with the condition called
 // In this scenario retry and backoff algorithm can be define as a edge which it's priority will be decrease with each time execution
@@ -34,8 +34,8 @@ func (drr *defaultRecoveryRoute) GetRouteId() string {
 	return "RECOVERY_ROUTE"
 }
 
-func (drr *defaultRecoveryRoute) GetStartState() *state {
-	return &state{
+func (drr *defaultRecoveryRoute) GetStartState() *State {
+	return &State{
 		name:        "default_recovery_state",
 		transitions: nil,
 		action: func(ctx *context) error {
@@ -48,19 +48,46 @@ func (drr *defaultRecoveryRoute) GetEndpoints() []*Endpoint {
 	return nil
 }
 
+// NewOrchestrator create and init orchestrator
 func NewOrchestrator() *orchestrator {
 	return &orchestrator{
 		routes: make(map[string]Route),
 	}
 }
 
+// Register is for register a route with it's unique identifier
 func (o *orchestrator) Register(r Route) error {
 	if o.routes[r.GetRouteId()] != nil {
 		return errors.New(fmt.Sprintf("duplicate route id %s", r.GetRouteId()))
 	}
 
+	if r.GetRouteId() == DefaultRecoveryRouteId {
+		return errors.New(DefaultRecoveryRouteId + " route id is reserved")
+	}
+
 	o.routes[r.GetRouteId()] = r
 	return nil
+}
+
+// Initialization define recovery route and define transition between routes (HierarchicalRoute feature)
+func (o *orchestrator) Initialization(recoveryRoute Route) error {
+	if err := o.defineRecoveryRoute(recoveryRoute); err != nil {
+		return err
+	}
+
+	return o.defineHierarchicalRouteTransitions()
+}
+
+// Exec start the execution process from the route id with a context
+func (o *orchestrator) Exec(from string, ctx *context, errCh chan error) {
+	if o.routes[from] == nil {
+		log.Fatalf("route %s not found", from)
+	}
+
+	o.ec = errCh
+	rh := newRouteRunner(o.routes[from].GetStartState(), o.routes[DefaultRecoveryRouteId].GetStartState())
+
+	rh.run(ctx, o.ec)
 }
 
 func (o *orchestrator) defineHierarchicalRouteTransitions() error {
@@ -70,7 +97,7 @@ func (o *orchestrator) defineHierarchicalRouteTransitions() error {
 				return errors.New(fmt.Sprintf("route id %s not found", e.To))
 			}
 
-			e.State.transitions = append(e.State.transitions, transition{
+			e.State.transitions = append(e.State.transitions, Transition{
 				to:       o.routes[e.To].GetStartState(),
 				priority: Default,
 				shouldTakeTransition: func(ctx context) bool {
@@ -79,7 +106,7 @@ func (o *orchestrator) defineHierarchicalRouteTransitions() error {
 			})
 
 			if reflect.TypeOf(o.routes[e.To]) == reflect.TypeOf(&TransactionalRoute{}) {
-				o.routes[e.To].GetStartState().transitions = append(o.routes[e.To].GetStartState().transitions, transition{
+				o.routes[e.To].GetStartState().transitions = append(o.routes[e.To].GetStartState().transitions, Transition{
 					to:       e.State,
 					priority: Default,
 					shouldTakeTransition: func(ctx context) bool {
@@ -93,7 +120,7 @@ func (o *orchestrator) defineHierarchicalRouteTransitions() error {
 	return nil
 }
 
-// "RECOVERY_ROUTE" reserved route id for recovery route
+// "RECOVERY_ROUTE" route id is reserved for recovery route
 func (o *orchestrator) defineRecoveryRoute(route Route) error {
 	r := route
 
@@ -107,27 +134,6 @@ func (o *orchestrator) defineRecoveryRoute(route Route) error {
 
 	o.routes[DefaultRecoveryRouteId] = r
 	return nil
-}
-
-func (o *orchestrator) Initialization(recoveryRoute Route) error {
-	if err := o.defineRecoveryRoute(recoveryRoute); err != nil {
-		return err
-	}
-
-	return o.defineHierarchicalRouteTransitions()
-}
-
-// Exec connect all endpoints to the proper route according to the route id with a transition
-// from is the starter route id
-func (o *orchestrator) Exec(from string, ctx *context, errCh chan error) {
-	if o.routes[from] == nil {
-		log.Fatalf("route %s not found", from)
-	}
-
-	o.ec = errCh
-	rh := newRouteRunner(o.routes[from].GetStartState(), o.routes[DefaultRecoveryRouteId].GetStartState())
-
-	rh.exec(ctx, o.ec)
 }
 
 func (o *orchestrator) shutdown() error {

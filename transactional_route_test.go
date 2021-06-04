@@ -18,11 +18,11 @@ func undoActionTest(ctx context) {
 
 }
 
-func execTestRoute(route *state) *routeRunner {
+func execTestRoute(route *State) *routeRunner {
 	rh := newRouteRunner(route, nil)
 	ctx, _ := NewContext()
 
-	rh.exec(ctx, nil)
+	rh.run(ctx, nil)
 	return rh
 }
 

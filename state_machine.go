@@ -14,24 +14,24 @@ const (
 
 type (
 	statemachine struct {
-		currentState *state
+		currentState *State
 		context      *context
 	}
 
-	state struct {
+	State struct {
 		name        string
-		transitions []transition
+		transitions []Transition
 		action      func(ctx *context) error
 	}
 
-	transition struct {
-		to                   *state
+	Transition struct {
+		to                   *State
 		priority             int
 		shouldTakeTransition func(ctx context) bool
 	}
 )
 
-func (sm *statemachine) init(currentState *state, ctx *context) {
+func (sm *statemachine) init(currentState *State, ctx *context) {
 	sm.currentState = currentState
 	sm.context = ctx
 
@@ -65,6 +65,6 @@ func (sm *statemachine) next() (err error) {
 	return err
 }
 
-func (sm *statemachine) getMemento() (*state, context) {
+func (sm *statemachine) getMemento() (*State, context) {
 	return sm.currentState, *sm.context
 }
