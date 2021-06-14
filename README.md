@@ -8,6 +8,7 @@ the main functionality:
 - [X] Error handling
 - [X] Hierarchical statemachine
 - [X] Customizable error handling
+- [ ] Route execution timeout
 
 Not support
 - Load balancing

@@ -49,9 +49,8 @@ func (rr *routeRunner) run(ctx *context, errCh chan<- error) {
 		if rr.recoveryRootState != nil {
 			rr.statemachine.init(rr.recoveryRootState, &mctx)
 
-			// skip recovery TransactionalRoute error
 			for rr.statemachine.hastNext() {
-				_ = rr.statemachine.next()
+				errCh <- rr.statemachine.next()
 			}
 
 			rr.statemachine.init(mst, &mctx)
