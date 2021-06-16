@@ -2,16 +2,21 @@ package orchestrator
 
 import (
 	"errors"
-	"fmt"
 	"github.com/google/uuid"
 	"sync"
 )
 
+const DefaultVersion = "v1"
+
 type context struct {
 	gid       string
 	lock      sync.Mutex
-	constant  map[string]interface{}
-	variables map[string]interface{}
+	variables map[string]row
+}
+
+type row struct {
+	version string
+	value   interface{}
 }
 
 func NewContext() (*context, error) {
@@ -28,35 +33,33 @@ func NewContextWithGid(gid string) (*context, error) {
 	return &context{
 		gid:       gid,
 		lock:      sync.Mutex{},
-		constant:  make(map[string]interface{}),
-		variables: make(map[string]interface{}),
+		variables: make(map[string]row),
 	}, nil
 }
 
-func (ctx *context) GetConstant(key string) interface{} {
-	return ctx.constant[key]
-}
-
-func (ctx *context) SetConstant(key string, value interface{}) error {
+func (ctx *context) SetVariableWithVersion(key string, lastVersion string, newVersion string, value interface{}) error {
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
-	if ctx.constant[key] != nil {
-		return errors.New(fmt.Sprintf("key %s was reservide", key))
+
+	ver := ctx.variables[key].version
+	if ver != "" && ver != lastVersion {
+		return errors.New("invalid data version")
 	}
 
-	ctx.constant[key] = value
+	ctx.variables[key] = row{
+		version: newVersion,
+		value:   value,
+	}
+
 	return nil
 }
 
-func (ctx *context) SetVariable(key string, value interface{}) {
-	ctx.lock.Lock()
-	defer ctx.lock.Unlock()
-
-	ctx.variables[key] = value
+func (ctx *context) SetVariable(key string, value interface{}) error {
+	return ctx.SetVariableWithVersion(key, DefaultVersion, DefaultVersion, value)
 }
 
 func (ctx *context) GetVariable(key string) interface{} {
-	return ctx.variables[key]
+	return ctx.variables[key].value
 }
 
 func (ctx *context) GetGid() string {

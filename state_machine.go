@@ -1,6 +1,9 @@
 package orchestrator
 
-import "sort"
+import (
+	"sort"
+	"time"
+)
 
 type statemachineStatus string
 
@@ -8,20 +11,20 @@ const (
 	SMStatusHeaderKey string = "SM_STATUS"
 
 	SMInProgress statemachineStatus = "IN_PROGRESS"
-	SMRollback   statemachineStatus = "ROLLBACK"
 	SMEnd        statemachineStatus = "END"
 )
 
 type (
 	statemachine struct {
-		currentState *State
-		context      *context
+		state   *State
+		context *context
 	}
 
 	State struct {
-		name        string
-		transitions []Transition
-		action      func(ctx *context) error
+		name          string
+		transitions   []Transition
+		action        func(ctx *context) error
+		actionTimeout time.Duration
 	}
 
 	Transition struct {
@@ -31,8 +34,8 @@ type (
 	}
 )
 
-func (sm *statemachine) init(currentState *State, ctx *context) {
-	sm.currentState = currentState
+func (sm *statemachine) init(state *State, ctx *context) {
+	sm.state = state
 	sm.context = ctx
 
 	if sm.context.GetVariable(SMStatusHeaderKey) == nil {
@@ -45,18 +48,16 @@ func (sm *statemachine) hastNext() bool {
 }
 
 func (sm *statemachine) next() (err error) {
-	if err = sm.currentState.action(sm.context); err != nil {
-		sm.context.SetVariable(SMStatusHeaderKey, SMRollback)
-	}
+	err = sm.state.action(sm.context)
 
 	// sort based on priority
-	sort.Slice(sm.currentState.transitions[:], func(i, j int) bool {
-		return sm.currentState.transitions[i].priority >= sm.currentState.transitions[j].priority
+	sort.Slice(sm.state.transitions[:], func(i, j int) bool {
+		return sm.state.transitions[i].priority >= sm.state.transitions[j].priority
 	})
 
-	for _, ts := range sm.currentState.transitions {
+	for _, ts := range sm.state.transitions {
 		if ts.shouldTakeTransition(*sm.context) {
-			sm.currentState = ts.to
+			sm.state = ts.to
 			return err
 		}
 	}
@@ -66,5 +67,5 @@ func (sm *statemachine) next() (err error) {
 }
 
 func (sm *statemachine) getMemento() (*State, context) {
-	return sm.currentState, *sm.context
+	return sm.state, *sm.context
 }

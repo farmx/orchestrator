@@ -36,19 +36,19 @@ func TestHappyScenario(t *testing.T) {
 
 	// init time
 	assert.Equal(t, true, sm.hastNext())
-	assert.Equal(t, state1, sm.currentState)
+	assert.Equal(t, state1, sm.state)
 	assert.Equal(t, SMInProgress, sm.context.GetVariable(SMStatusHeaderKey))
 
 	// cycle one
 	assert.Nil(t, sm.next())
-	assert.Equal(t, state2, sm.currentState)
+	assert.Equal(t, state2, sm.state)
 	assert.Equal(t, SMInProgress, sm.context.GetVariable(SMStatusHeaderKey))
 	assert.Equal(t, true, sm.hastNext())
 
 	// cycle three
 	assert.Nil(t, sm.next())
 	assert.Equal(t, false, sm.hastNext())
-	assert.Equal(t, state2, sm.currentState)
+	assert.Equal(t, state2, sm.state)
 	assert.Equal(t, SMEnd, sm.context.GetVariable(SMStatusHeaderKey))
 }
 
@@ -94,25 +94,25 @@ func TestRollback(t *testing.T) {
 
 	// init time
 	assert.Equal(t, true, sm.hastNext())
-	assert.Equal(t, state1, sm.currentState)
+	assert.Equal(t, state1, sm.state)
 	assert.Equal(t, SMInProgress, sm.context.GetVariable(SMStatusHeaderKey))
 
 	// cycle one
 	assert.Nil(t, sm.next())
-	assert.Equal(t, state2, sm.currentState)
+	assert.Equal(t, state2, sm.state)
 	assert.Equal(t, SMInProgress, sm.context.GetVariable(SMStatusHeaderKey))
 	assert.Equal(t, true, sm.hastNext())
 
 	// cycle two
 	assert.NotNil(t, sm.next())
-	assert.Equal(t, state1, sm.currentState)
+	assert.Equal(t, state1, sm.state)
 	assert.Equal(t, SMRollback, sm.context.GetVariable(SMStatusHeaderKey))
 	assert.Equal(t, true, sm.hastNext())
 
 	// cycle three
 	assert.Nil(t, sm.next())
 	assert.Equal(t, false, sm.hastNext())
-	assert.Equal(t, state1, sm.currentState)
+	assert.Equal(t, state1, sm.state)
 	assert.Equal(t, SMEnd, sm.context.GetVariable(SMStatusHeaderKey))
 }
 
@@ -161,25 +161,25 @@ func TestLoop(t *testing.T) {
 	// cycle one
 	assert.Equal(t, true, sm.hastNext())
 	assert.Nil(t, sm.next())
-	assert.Equal(t, state1, sm.currentState)
+	assert.Equal(t, state1, sm.state)
 	assert.Equal(t, SMInProgress, sm.context.GetVariable(SMStatusHeaderKey))
 
 	// cycle two
 	assert.Equal(t, true, sm.hastNext())
 	assert.Nil(t, sm.next())
-	assert.Equal(t, state1, sm.currentState)
+	assert.Equal(t, state1, sm.state)
 	assert.Equal(t, SMInProgress, sm.context.GetVariable(SMStatusHeaderKey))
 
 	// cycle three
 	assert.Equal(t, true, sm.hastNext())
 	assert.Nil(t, sm.next())
-	assert.Equal(t, state2, sm.currentState)
+	assert.Equal(t, state2, sm.state)
 	assert.Equal(t, SMInProgress, sm.context.GetVariable(SMStatusHeaderKey))
 
 	// cycle four
 	assert.Equal(t, true, sm.hastNext())
 	assert.Nil(t, sm.next())
-	assert.Equal(t, state2, sm.currentState)
+	assert.Equal(t, state2, sm.state)
 	assert.Equal(t, SMEnd, sm.context.GetVariable(SMStatusHeaderKey))
 
 }
