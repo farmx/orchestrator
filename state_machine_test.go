@@ -1,283 +1,188 @@
 package orchestrator
 
 import (
-	"errors"
 	"github.com/stretchr/testify/assert"
 	"log"
 	"testing"
 )
 
+// S1--->S2
 func TestHappyScenario(t *testing.T) {
-	state1 := &State{
+	s1 := &State{
+		name: "S1",
 		action: func(ctx *context) error {
 			log.Print("State 1 action")
 			return nil
 		},
 	}
 
-	state2 := &State{
+	s2 := &State{
+		name: "S2",
 		action: func(ctx *context) error {
 			log.Print("State 2 action")
 			return nil
 		},
 	}
 
-	state1.transitions = append(state1.transitions, Transition{
-		to:       state2,
-		priority: 1,
-		shouldTakeTransition: func(ctx context) bool {
+	s1.createTransition(s2, 1,
+		func(ctx context) bool {
 			return true
-		},
-	})
+		})
 
 	ctx, _ := NewContext()
 	sm := &statemachine{}
-	sm.init(state1, ctx)
+	sm.init(s1, ctx)
 
 	// init time
-	assert.Equal(t, true, sm.hastNext())
-	assert.Equal(t, state1, sm.state)
-	assert.Equal(t, SMInProgress, sm.context.GetVariable(SMStatusHeaderKey))
+	hasNext, _ := sm.doAction()
+	assert.Equal(t, true, hasNext)
+	assert.Equal(t, s2, sm.state)
 
-	// cycle one
-	assert.Nil(t, sm.next())
-	assert.Equal(t, state2, sm.state)
-	assert.Equal(t, SMInProgress, sm.context.GetVariable(SMStatusHeaderKey))
-	assert.Equal(t, true, sm.hastNext())
-
-	// cycle three
-	assert.Nil(t, sm.next())
-	assert.Equal(t, false, sm.hastNext())
-	assert.Equal(t, state2, sm.state)
-	assert.Equal(t, SMEnd, sm.context.GetVariable(SMStatusHeaderKey))
+	// move to next state
+	hasNext, _ = sm.doAction()
+	assert.Equal(t, s2, sm.state)
+	assert.Equal(t, false, hasNext)
 }
 
-func TestRollback(t *testing.T) {
-	state1 := &State{
-		action: func(ctx *context) error {
-			if ctx.GetVariable(SMStatusHeaderKey) == SMRollback {
-				log.Print("rollback call")
-				return nil
-			}
-
-			log.Print("State 1 action")
-			return nil
-		},
-	}
-
-	state2 := &State{
-		action: func(ctx *context) error {
-			log.Print("State 2 action")
-			return errors.New("fake error")
-		},
-	}
-
-	state1.transitions = append(state1.transitions, Transition{
-		to:       state2,
-		priority: 1,
-		shouldTakeTransition: func(ctx context) bool {
-			return ctx.GetVariable(SMStatusHeaderKey) != SMRollback
-		},
-	})
-
-	state2.transitions = append(state2.transitions, Transition{
-		to:       state1,
-		priority: 1,
-		shouldTakeTransition: func(ctx context) bool {
-			return ctx.GetVariable(SMStatusHeaderKey) == SMRollback
-		},
-	})
-
-	ctx, _ := NewContext()
-	sm := &statemachine{}
-	sm.init(state1, ctx)
-
-	// init time
-	assert.Equal(t, true, sm.hastNext())
-	assert.Equal(t, state1, sm.state)
-	assert.Equal(t, SMInProgress, sm.context.GetVariable(SMStatusHeaderKey))
-
-	// cycle one
-	assert.Nil(t, sm.next())
-	assert.Equal(t, state2, sm.state)
-	assert.Equal(t, SMInProgress, sm.context.GetVariable(SMStatusHeaderKey))
-	assert.Equal(t, true, sm.hastNext())
-
-	// cycle two
-	assert.NotNil(t, sm.next())
-	assert.Equal(t, state1, sm.state)
-	assert.Equal(t, SMRollback, sm.context.GetVariable(SMStatusHeaderKey))
-	assert.Equal(t, true, sm.hastNext())
-
-	// cycle three
-	assert.Nil(t, sm.next())
-	assert.Equal(t, false, sm.hastNext())
-	assert.Equal(t, state1, sm.state)
-	assert.Equal(t, SMEnd, sm.context.GetVariable(SMStatusHeaderKey))
-}
-
+// --->S1---->S2
+// \__/
 func TestLoop(t *testing.T) {
-	headerKey := "HEADER_KEY"
+	const headerKey = "HEADER_KEY"
 
-	state1 := &State{
+	s1 := &State{
+		name: "S1",
 		action: func(ctx *context) error {
 			if v := ctx.GetVariable(headerKey); v == nil {
 				ctx.SetVariable(headerKey, 0)
 			}
 
-			ctx.SetVariable(headerKey, ctx.GetVariable(headerKey).(int)+1)
+			ctr := ctx.GetVariable(headerKey).(int) + 1
 			log.Print("State 1 action")
-			return nil
+			return ctx.SetVariable(headerKey, ctr)
 		},
 	}
 
-	state2 := &State{
+	s2 := &State{
+		name: "S2",
 		action: func(ctx *context) error {
 			log.Print("State 2 action")
 			return nil
 		},
 	}
 
-	state1.transitions = append(state1.transitions, Transition{
-		to:       state2,
-		priority: 1,
-		shouldTakeTransition: func(ctx context) bool {
+	s1.createTransition(s2, 1,
+		func(ctx context) bool {
 			return ctx.GetVariable(headerKey) == 3
-		},
-	})
+		})
 
-	state1.transitions = append(state1.transitions, Transition{
-		to:       state1,
-		priority: 1,
-		shouldTakeTransition: func(ctx context) bool {
+	s1.createTransition(s1, 1,
+		func(ctx context) bool {
 			return ctx.GetVariable(headerKey).(int) < 3
-		},
-	})
+		})
 
 	ctx, _ := NewContext()
 	sm := &statemachine{}
-	sm.init(state1, ctx)
+	sm.init(s1, ctx)
 
 	// cycle one
-	assert.Equal(t, true, sm.hastNext())
-	assert.Nil(t, sm.next())
-	assert.Equal(t, state1, sm.state)
-	assert.Equal(t, SMInProgress, sm.context.GetVariable(SMStatusHeaderKey))
+	hasNext, _ := sm.doAction()
+	assert.Equal(t, true, hasNext)
+	assert.Equal(t, s1, sm.state)
 
 	// cycle two
-	assert.Equal(t, true, sm.hastNext())
-	assert.Nil(t, sm.next())
-	assert.Equal(t, state1, sm.state)
-	assert.Equal(t, SMInProgress, sm.context.GetVariable(SMStatusHeaderKey))
+	hasNext, _ = sm.doAction()
+	assert.Equal(t, true, hasNext)
+	assert.Equal(t, s1, sm.state)
 
 	// cycle three
-	assert.Equal(t, true, sm.hastNext())
-	assert.Nil(t, sm.next())
-	assert.Equal(t, state2, sm.state)
-	assert.Equal(t, SMInProgress, sm.context.GetVariable(SMStatusHeaderKey))
+	hasNext, _ = sm.doAction()
+	assert.Equal(t, true, hasNext)
+	assert.Equal(t, s2, sm.state)
 
 	// cycle four
-	assert.Equal(t, true, sm.hastNext())
-	assert.Nil(t, sm.next())
-	assert.Equal(t, state2, sm.state)
-	assert.Equal(t, SMEnd, sm.context.GetVariable(SMStatusHeaderKey))
-
+	hasNext, _ = sm.doAction()
+	assert.Equal(t, false, hasNext)
+	assert.Equal(t, s2, sm.state)
 }
-
+//  /---->S3---------\
+// S1--->S2--->S4--->S5
+//  \----------------/
 func TestComplexCondition(t *testing.T) {
-	state1 := &State{
-		name: "state_1",
+	s1 := &State{
+		name: "S1",
 		action: func(ctx *context) error {
 			log.Print("State 1 action")
 			return nil
 		},
 	}
 
-	state2 := &State{
-		name: "state_2",
+	s2 := &State{
+		name: "S2",
 		action: func(ctx *context) error {
 			log.Print("State 2 action")
 			return nil
 		},
 	}
 
-	state3 := &State{
-		name: "state_3",
+	s3 := &State{
+		name: "S3",
 		action: func(ctx *context) error {
 			log.Print("State 3 action")
 			return nil
 		},
 	}
 
-	state4 := &State{
-		name: "state_4",
+	s4 := &State{
+		name: "S4",
 		action: func(ctx *context) error {
 			log.Print("State 4 action")
 			return nil
 		},
 	}
 
-	state5 := &State{
-		name: "state_5",
+	s5 := &State{
+		name: "S5",
 		action: func(ctx *context) error {
 			log.Print("State 5 action")
 			return nil
 		},
 	}
 
-	state1.transitions = append(state1.transitions, Transition{
-		to:       state2,
-		priority: 2,
-		shouldTakeTransition: func(ctx context) bool {
+	s1.createTransition(s2, 2,
+		func(ctx context) bool {
 			return true
-		},
-	})
+		})
 
-	state1.transitions = append(state1.transitions, Transition{
-		to:       state3,
-		priority: 2,
-		shouldTakeTransition: func(ctx context) bool {
+	s1.createTransition(s3, 2,
+		func(ctx context) bool {
 			return false
-		},
-	})
+		})
 
-	state2.transitions = append(state2.transitions, Transition{
-		to:       state4,
-		priority: 1,
-		shouldTakeTransition: func(ctx context) bool {
+	s2.createTransition(s4,1,
+		func(ctx context) bool {
 			return true
-		},
-	})
+		})
 
-	state4.transitions = append(state4.transitions, Transition{
-		to:       state5,
-		priority: 1,
-		shouldTakeTransition: func(ctx context) bool {
+	s4.createTransition(s5,1,
+		func(ctx context) bool {
 			return true
-		},
-	})
+		})
 
-	state3.transitions = append(state3.transitions, Transition{
-		to:       state5,
-		priority: 1,
-		shouldTakeTransition: func(ctx context) bool {
+	s3.createTransition(s5, 1,
+		func(ctx context) bool {
 			return true
-		},
-	})
+		})
 
-	state1.transitions = append(state1.transitions, Transition{
-		to:       state5,
-		priority: 1,
-		shouldTakeTransition: func(ctx context) bool {
+	s1.createTransition(s5, 1,
+		func(ctx context) bool {
 			return true
-		},
-	})
+		})
 
 	ctx, _ := NewContext()
 	sm := &statemachine{}
-	sm.init(state1, ctx)
+	sm.init(s1, ctx)
 
-	for sm.hastNext() {
-		_ = sm.next()
+	for hasNext := false; hasNext != false; hasNext, _ = sm.doAction() {
+
 	}
 }

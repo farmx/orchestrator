@@ -78,7 +78,6 @@ func TestOrchestrator_Exec_RollbackBetweenTransactionalRoute(t *testing.T) {
 	}
 
 	dab := func(ctx *context) error {
-
 		ctx.SetVariable("STATE", "UAB")
 		return errors.New("fake error")
 	}

@@ -1,27 +1,17 @@
 package orchestrator
 
-type routeStatus string
-
-const (
-	InProgress routeStatus = "IN_PROGRESS"
-	Done       routeStatus = "DONE"
-)
-
 type routeRunner struct {
-	// TransactionalRoute handler id
+	// runner id
 	id string
 
-	// action TransactionalRoute root State
+	// route root State
 	routeRootState *State
 
-	// recovery TransactionalRoute root State
+	// recovery route root State
 	recoveryRootState *State
 
 	// statemachine ...
 	statemachine *statemachine
-
-	// TransactionalRoute transaction execution status
-	status routeStatus
 }
 
 func newRouteRunner(routeRootState *State, recoveryRootState *State) *routeRunner {
@@ -33,31 +23,29 @@ func newRouteRunner(routeRootState *State, recoveryRootState *State) *routeRunne
 }
 
 func (rr *routeRunner) run(ctx *context, errCh chan<- error) {
-	rr.statemachine.init(rr.routeRootState, ctx)
-	rr.status = InProgress
+	var err error
 
-	for rr.statemachine.hastNext() {
-		err := rr.statemachine.next()
+	rr.statemachine.init(rr.routeRootState, ctx)
+
+	for hasNext := true ;  hasNext == true; hasNext, err = rr.statemachine.doAction() {
 		mst, mctx := rr.statemachine.getMemento()
 
-		if err == nil {
-			continue
+		if errCh != nil && err != nil {
+			errCh <- err
 		}
 
-		errCh <- err
-
-		if rr.recoveryRootState != nil {
+		// call error recovery handler
+		if err != nil && rr.recoveryRootState != nil {
 			rr.statemachine.init(rr.recoveryRootState, &mctx)
 
-			for rr.statemachine.hastNext() {
-				errCh <- rr.statemachine.next()
+			for rcHasNext := true ;  rcHasNext == true; rcHasNext, err = rr.statemachine.doAction() {
+				errCh <- err
 			}
 
 			rr.statemachine.init(mst, &mctx)
 		}
 	}
 
-	rr.status = Done
 }
 
 func (rr *routeRunner) shutdown() {

@@ -9,6 +9,7 @@ the main functionality:
 - [X] Hierarchical statemachine
 - [X] Customizable error handling
 - [ ] Route execution timeout
+- [ ] Component
 
 Not support
 - Load balancing

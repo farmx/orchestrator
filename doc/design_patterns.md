@@ -33,7 +33,7 @@ The observer pattern is a software design pattern in which an object, named the 
 
 ![diagram](pic/uml_observer.jpg)
 
-### Refrence
+### Reference
 * Wikipedia
 	* [COR](https://en.wikipedia.org/wiki/Chain-of-responsibility_pattern)
 	* [Memento](https://en.wikipedia.org/wiki/Memento_pattern)

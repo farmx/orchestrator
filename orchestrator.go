@@ -9,7 +9,7 @@ import (
 
 // Every TransactionalRoute is created from multiple State those are connected with and edge
 // Each edge has a priority and a condition
-// To go to the next step the edge sorted by priority and the first do-Action which comply with the condition called
+// To go to the doAction step the edge sorted by priority and the first do-Action which comply with the condition called
 // In this scenario retry and backoff algorithm can be define as a edge which it's priority will be decrease with each time execution
 // Orchestrator handover context between registered TransactionalRoute, based on their identifier
 
@@ -97,22 +97,16 @@ func (o *orchestrator) defineHierarchicalRouteTransitions() error {
 				return errors.New(fmt.Sprintf("route id %s not found", e.To))
 			}
 
-			e.State.transitions = append(e.State.transitions, Transition{
-				to:       o.routes[e.To].GetStartState(),
-				priority: Default,
-				shouldTakeTransition: func(ctx context) bool {
+			e.State.createTransition(o.routes[e.To].GetStartState(), Default,
+				func(ctx context) bool {
 					return true
-				},
-			})
+				})
 
 			if reflect.TypeOf(o.routes[e.To]) == reflect.TypeOf(&TransactionalRoute{}) {
-				o.routes[e.To].GetStartState().transitions = append(o.routes[e.To].GetStartState().transitions, Transition{
-					to:       e.State,
-					priority: Default,
-					shouldTakeTransition: func(ctx context) bool {
-						return ctx.GetVariable(SMStatusHeaderKey) == SMRollback
-					},
-				})
+				o.routes[e.To].GetStartState().createTransition(e.State, Default,
+					func(ctx context) bool {
+						return ctx.GetVariable(TrStatusHeaderKey) == TrRollback
+					})
 			}
 		}
 	}

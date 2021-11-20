@@ -5,19 +5,10 @@ import (
 	"time"
 )
 
-type statemachineStatus string
-
-const (
-	SMStatusHeaderKey string = "SM_STATUS"
-
-	SMInProgress statemachineStatus = "IN_PROGRESS"
-	SMEnd        statemachineStatus = "END"
-)
-
 type (
 	statemachine struct {
-		state   *State
-		context *context
+		state              *State
+		context            *context
 	}
 
 	State struct {
@@ -34,22 +25,15 @@ type (
 	}
 )
 
-func (sm *statemachine) init(state *State, ctx *context) {
-	sm.state = state
+func (sm *statemachine) init(startState *State, ctx *context) {
+	sm.state = startState
 	sm.context = ctx
-
-	if sm.context.GetVariable(SMStatusHeaderKey) == nil {
-		sm.context.SetVariable(SMStatusHeaderKey, SMInProgress)
-	}
 }
 
-func (sm *statemachine) hastNext() bool {
-	return sm.context.GetVariable(SMStatusHeaderKey) != SMEnd
-}
+func (sm *statemachine) doAction() (bool, error) {
+	err := sm.state.action(sm.context)
 
-func (sm *statemachine) next() (err error) {
-	err = sm.state.action(sm.context)
-
+	// TODO: <Decision making> the priority can be dynamic according to the context values or static and cache it for performance improvement
 	// sort based on priority
 	sort.Slice(sm.state.transitions[:], func(i, j int) bool {
 		return sm.state.transitions[i].priority >= sm.state.transitions[j].priority
@@ -58,14 +42,21 @@ func (sm *statemachine) next() (err error) {
 	for _, ts := range sm.state.transitions {
 		if ts.shouldTakeTransition(*sm.context) {
 			sm.state = ts.to
-			return err
+			return true, err
 		}
 	}
 
-	sm.context.SetVariable(SMStatusHeaderKey, SMEnd)
-	return err
+	return false, err
 }
 
 func (sm *statemachine) getMemento() (*State, context) {
 	return sm.state, *sm.context
+}
+
+func (s *State) createTransition(to *State, priority int, shouldTakeTransition func(ctx context) bool) {
+	s.transitions = append(s.transitions, Transition{
+		to:       to,
+		priority: priority,
+		shouldTakeTransition: shouldTakeTransition,
+	})
 }

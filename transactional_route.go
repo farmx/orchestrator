@@ -16,6 +16,11 @@ const (
 	DefaultPrefix   = "s"
 	ConditionPrefix = "sc"
 	OtherwisePrefix = "sc!"
+
+	TrStatusHeaderKey = "TRANSACTION_STATUS"
+	TrRollback        = "ROLLBACK"
+	TrInProgress      = "IN_PROGRESS"
+	TrEnd             = "END"
 )
 
 type (
@@ -119,7 +124,7 @@ func (tr *TransactionalRoute) AddNextStep(doAction func(ctx *context) error, und
 		}
 
 		tr.defineTwoWayTransition(tr.lastState, Default, func(ctx context) bool {
-			return ctx.GetVariable(SMStatusHeaderKey) != SMRollback
+			return ctx.GetVariable(TrStatusHeaderKey) != TrRollback
 		}, s)
 	}
 
@@ -226,7 +231,7 @@ func (tr *TransactionalRoute) GetEndpoints() []*Endpoint {
 
 func (tr *TransactionalRoute) defineAction(doAction func(ctx *context) error, undoAction func(ctx context)) func(ctx *context) error {
 	return func(ctx *context) error {
-		if ctx.GetVariable(SMStatusHeaderKey) == SMRollback {
+		if ctx.GetVariable(TrStatusHeaderKey) == TrRollback {
 			undoAction(*ctx)
 			return nil
 		}
@@ -241,7 +246,7 @@ func (tr *TransactionalRoute) defineTwoWayTransition(src *State, priority int, p
 		to:       dst,
 		priority: priority,
 		shouldTakeTransition: func(ctx context) bool {
-			return predicate(ctx) && ctx.GetVariable(SMStatusHeaderKey) != SMRollback
+			return predicate(ctx) && ctx.GetVariable(TrStatusHeaderKey) != TrRollback
 		},
 	})
 
@@ -250,7 +255,7 @@ func (tr *TransactionalRoute) defineTwoWayTransition(src *State, priority int, p
 		to:       src,
 		priority: Default,
 		shouldTakeTransition: func(ctx context) bool {
-			return ctx.GetVariable(SMStatusHeaderKey) == SMRollback
+			return ctx.GetVariable(TrStatusHeaderKey) == TrRollback
 		},
 	})
 }
@@ -269,7 +274,7 @@ func (tr *TransactionalRoute) getConditionalLastStates(root *State) []*State {
 func lastState(state *State) *State {
 	for _, tr := range state.transitions {
 		ctx, _ := NewContext()
-		ctx.SetVariable(SMStatusHeaderKey, SMRollback)
+		ctx.SetVariable(TrStatusHeaderKey, TrRollback)
 		if tr.priority == Default && !tr.shouldTakeTransition(*ctx) {
 			return lastState(tr.to)
 		}

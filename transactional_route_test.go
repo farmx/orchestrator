@@ -10,7 +10,7 @@ func doActionTest(ctx *context) error {
 		ctx.SetVariable("HK", 0)
 	}
 
-	ctx.SetVariable("HK", ctx.GetVariable("HK").(int)+1)
+	ctx.SetVariable("HK", ctx.GetVariable("HK").(int) + 1)
 	return nil
 }
 
@@ -19,11 +19,11 @@ func undoActionTest(ctx context) {
 }
 
 func execTestRoute(route *State) *routeRunner {
-	rh := newRouteRunner(route, nil)
+	runner := newRouteRunner(route, nil)
 	ctx, _ := NewContext()
 
-	rh.run(ctx, nil)
-	return rh
+	runner.run(ctx, nil)
+	return runner
 }
 
 func TestDefineUnconditionalRoute(t *testing.T) {
@@ -32,9 +32,9 @@ func TestDefineUnconditionalRoute(t *testing.T) {
 		AddNextStep(doActionTest, undoActionTest).
 		AddNextStep(doActionTest, undoActionTest)
 
-	rh := execTestRoute(r.GetStartState())
+	rr := execTestRoute(r.GetStartState())
 
-	assert.Equal(t, 3, rh.statemachine.context.GetVariable("HK"))
+	assert.Equal(t, 3, rr.statemachine.context.GetVariable("HK"))
 }
 
 func TestDefineConditionalRoute(t *testing.T) {
