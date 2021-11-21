@@ -4,17 +4,19 @@ import (
 	"strconv"
 )
 
-type counter struct {
+type labelGenerator struct {
+	prefix string
 	versions []int
 }
 
-func newCounter() *counter {
-	return &counter{
+func newLabelGenerator(prefix string) *labelGenerator {
+	return &labelGenerator{
+		prefix: prefix,
 		versions: []int{0},
 	}
 }
 
-func (c *counter) next() string {
+func (c *labelGenerator) getLabel() string {
 	index := len(c.versions) - 1
 	c.versions[index] = c.versions[index] + 1
 
@@ -24,13 +26,14 @@ func (c *counter) next() string {
 	}
 
 	return cr
+	//return fmt.Sprintf("%s_%s", c.prefix, cr)
 }
 
-func (c *counter) subVersioning() {
+func (c *labelGenerator) hasChild() {
 	c.versions = append(c.versions, 0)
 }
 
-func (c *counter) endSubVersioning() {
+func (c *labelGenerator) endChild() {
 	lenv := len(c.versions)
 	c.versions = c.versions[:lenv-1]
 }

@@ -2,25 +2,11 @@ package orchestrator
 
 import "fmt"
 
-type transitionState string
-
 const (
-	Main transitionState = "MAIN"
-	When transitionState = "WHEN"
-	Else transitionState = "ELSE"
-	End  transitionState = "END"
-
-	Condition int = 2
-	Default   int = 1
-
-	DefaultPrefix   = "s"
-	ConditionPrefix = "sc"
-	OtherwisePrefix = "sc!"
-
-	TrStatusHeaderKey = "TRANSACTION_STATUS"
-	TrRollback        = "ROLLBACK"
-	TrInProgress      = "IN_PROGRESS"
-	TrEnd             = "END"
+	transactionStatusHeaderKey  = "TRANSACTION_STATUS"
+	transactionStatusRollback   = "ROLLBACK"
+	transactionStatusInProgress = "IN_PROGRESS"
+	transactionStatusEnd        = "END"
 )
 
 type (
@@ -32,82 +18,40 @@ type (
 		startState *State
 
 		// route state
-		state transitionState
+		routeState routeState
 
 		// latest added state
 		lastState *State
 
-		// state name prefix
-		statePrefix string
-
-		// conditionStateStack keep condition steps for Otherwise/End-condition purpose
-		predicateStack stateStack
-
-		// naming the state
-		counter *counter
+		// predicateStateStack keep conditional state for Otherwise/End-condition transition
+		predicateStateStack predicateStateStack
 
 		// endpoint list
 		endpoints []*Endpoint
 	}
 
-	stateStack struct {
-		stack []predicateState
-	}
-
-	predicateState struct {
-		predicate func(context) bool
-		state     *State
-	}
-
-	onlyProcessor interface {
-		AddNextStep(doAction func(ctx *context) error, undoAction func(ctx context)) *TransactionalRoute
+	// force to present AddNextStep method only
+	onlyTRAddNextStep interface {
+		AddNextStep(name string, doAction func(ctx *context) error, undoAction func(ctx context)) *TransactionalRoute
 	}
 )
-
-func (tss *stateStack) isEmpty() bool {
-	return len(tss.stack) < 1
-}
-
-func (tss *stateStack) push(predicate func(context) bool, state *State) {
-	tss.stack = append(tss.stack, predicateState{
-		predicate: predicate,
-		state:     state,
-	})
-}
-
-func (tss *stateStack) getLast() predicateState {
-	stackLen := len(tss.stack)
-
-	return tss.stack[stackLen-1]
-}
-
-func (tss *stateStack) pop() predicateState {
-	stackLen := len(tss.stack)
-
-	s := tss.stack[stackLen-1]
-	tss.stack = tss.stack[:stackLen-1]
-
-	return s
-}
 
 // NewTransactionalRoute define and return a TransactionalRoute
 func NewTransactionalRoute(id string) *TransactionalRoute {
 	return &TransactionalRoute{
-		id:          id,
-		counter:     newCounter(),
-		state:       Main,
-		statePrefix: DefaultPrefix,
+		id:             id,
+		routeState:          Main,
 	}
 }
 
 // AddNextStep add new step to TransactionalRoute
-func (tr *TransactionalRoute) AddNextStep(doAction func(ctx *context) error, undoAction func(ctx context)) *TransactionalRoute {
+func (tr *TransactionalRoute) AddNextStep(name string, doAction func(ctx *context) error, undoAction func(ctx context)) *TransactionalRoute {
 	s := &State{
-		name:   fmt.Sprintf("%s_%s_%s", tr.id, tr.statePrefix, tr.counter.next()),
+		name:   fmt.Sprintf("%s_%s", tr.id, name),
 		action: tr.defineAction(doAction, undoAction),
 	}
 
-	switch tr.state {
+	switch tr.routeState {
 	case When:
 		tr.addNextStepAfterWhen(s)
 		break
@@ -124,22 +68,22 @@ func (tr *TransactionalRoute) AddNextStep(doAction func(ctx *context) error, und
 		}
 
 		tr.defineTwoWayTransition(tr.lastState, Default, func(ctx context) bool {
-			return ctx.GetVariable(TrStatusHeaderKey) != TrRollback
+			return ctx.GetVariable(transactionStatusHeaderKey) != transactionStatusRollback
 		}, s)
 	}
 
 	// update last State
 	tr.lastState = s
-	tr.state = Main
+	tr.routeState = Main
 	return tr
 }
 
 func (tr *TransactionalRoute) addNextStepAfterWhen(s *State) {
-	tr.defineTwoWayTransition(tr.lastState, Condition, tr.predicateStack.getLast().predicate, s)
+	tr.defineTwoWayTransition(tr.lastState, Condition, tr.predicateStateStack.getLast().predicate, s)
 }
 
 func (tr *TransactionalRoute) addNextStepAfterOtherwise(s *State) {
-	ps := tr.predicateStack.getLast()
+	ps := tr.predicateStateStack.getLast()
 
 	tr.defineTwoWayTransition(ps.state, Condition, func(ctx context) bool {
 		return !ps.predicate(ctx)
@@ -152,58 +96,43 @@ func (tr *TransactionalRoute) addNextStepAfterOtherwise(s *State) {
 //  included        |       |    |
 //       \         /        |   /
 //        End State       End State
-
 func (tr *TransactionalRoute) addNextStepAfterEnd(s *State) {
+	cs := tr.predicateStateStack.pop().state
 	predicate := func(ctx context) bool {
 		return true
 	}
 
-	cs := tr.predicateStack.pop().state
-
 	// define Transition from last State of each condition State
-	cls := tr.getConditionalLastStates(cs)
-	for _, es := range cls {
+	states := tr.getEachTransitionLatestState(cs)
+	for _, es := range states {
 		tr.defineTwoWayTransition(es, Default, predicate, s)
 	}
 
 	// Otherwise doesn't define
-	if len(cls) < 2 {
-		// define a Transition from root condition State
+	if len(states) < 2 {
+		// define a Transition from latest state with a conditional transition
 		tr.defineTwoWayTransition(cs, Default, predicate, s)
 	}
 }
 
 // When to define a condition
-func (tr *TransactionalRoute) When(predicate func(ctx context) bool) onlyProcessor {
-	tr.state = When
-	tr.predicateStack.push(predicate, tr.lastState)
-
-	// State naming
-	tr.statePrefix = ConditionPrefix
-	tr.counter.subVersioning()
+func (tr *TransactionalRoute) When(predicate func(ctx context) bool) onlyTRAddNextStep {
+	tr.routeState = When
+	tr.predicateStateStack.push(predicate, tr.lastState)
 
 	return tr
 }
 
 // Otherwise When condition
-func (tr *TransactionalRoute) Otherwise() onlyProcessor {
-	tr.state = Else
-
-	// State naming
-	tr.statePrefix = OtherwisePrefix
-	tr.counter.endSubVersioning()
-	tr.counter.subVersioning()
+func (tr *TransactionalRoute) Otherwise() onlyTRAddNextStep {
+	tr.routeState = Else
 
 	return tr
 }
 
 // End of condition
-func (tr *TransactionalRoute) End() onlyProcessor {
-	tr.state = End
-
-	// State naming
-	tr.statePrefix = DefaultPrefix
-	tr.counter.endSubVersioning()
+func (tr *TransactionalRoute) End() onlyTRAddNextStep {
+	tr.routeState = End
 
 	return tr
 }
@@ -231,7 +160,7 @@ func (tr *TransactionalRoute) GetEndpoints() []*Endpoint {
 
 func (tr *TransactionalRoute) defineAction(doAction func(ctx *context) error, undoAction func(ctx context)) func(ctx *context) error {
 	return func(ctx *context) error {
-		if ctx.GetVariable(TrStatusHeaderKey) == TrRollback {
+		if ctx.GetVariable(transactionStatusHeaderKey) == transactionStatusRollback {
 			undoAction(*ctx)
 			return nil
 		}
@@ -242,41 +171,37 @@ func (tr *TransactionalRoute) defineAction(doAction func(ctx *context) error, un
 
 func (tr *TransactionalRoute) defineTwoWayTransition(src *State, priority int, predicate func(context) bool, dst *State) {
 	// define a Transition form src State to dst State
-	src.transitions = append(src.transitions, Transition{
-		to:       dst,
-		priority: priority,
-		shouldTakeTransition: func(ctx context) bool {
-			return predicate(ctx) && ctx.GetVariable(TrStatusHeaderKey) != TrRollback
-		},
-	})
+	src.createTransition(dst, priority,
+		 func(ctx context) bool {
+			return predicate(ctx) && ctx.GetVariable(transactionStatusHeaderKey) != transactionStatusRollback
+		})
 
 	// define a Transition from dst to src State for rollback
-	dst.transitions = append(dst.transitions, Transition{
-		to:       src,
-		priority: Default,
-		shouldTakeTransition: func(ctx context) bool {
-			return ctx.GetVariable(TrStatusHeaderKey) == TrRollback
-		},
-	})
+	dst.createTransition(src, Default,
+		func(ctx context) bool {
+			return ctx.GetVariable(transactionStatusHeaderKey) == transactionStatusRollback
+		})
 }
 
-func (tr *TransactionalRoute) getConditionalLastStates(root *State) []*State {
+func (tr *TransactionalRoute) getEachTransitionLatestState(state *State) []*State {
 	var result []*State
-	for _, t := range root.transitions {
+	for _, t := range state.transitions {
 		if t.priority == Condition {
-			result = append(result, lastState(t.to))
+			result = append(result, getLatestState(t.to))
 		}
 	}
 
 	return result
 }
 
-func lastState(state *State) *State {
+// looking for latest state
+func getLatestState(state *State) *State {
 	for _, tr := range state.transitions {
 		ctx, _ := NewContext()
-		ctx.SetVariable(TrStatusHeaderKey, TrRollback)
+		ctx.SetVariable(transactionStatusHeaderKey, transactionStatusRollback)
+		// choose happy path transition
 		if tr.priority == Default && !tr.shouldTakeTransition(*ctx) {
-			return lastState(tr.to)
+			return getLatestState(tr.to)
 		}
 	}
 

@@ -45,13 +45,13 @@ func TestOrchestrator_Exec_HandoverBetweenRoutes(t *testing.T) {
 
 	orch := NewOrchestrator()
 	ar := NewTransactionalRoute(aRoute).
-		AddNextStep(daa, uaa).
+		AddNextStep("1", daa, uaa).
 		When(func(ctx context) bool { return true }).
-		AddNextStep(daa, uaa).To(bRoute).
+		AddNextStep("when_1", daa, uaa).To(bRoute).
 		End().
-		AddNextStep(daa, uaa)
+		AddNextStep("2", daa, uaa)
 
-	br := NewTransactionalRoute(bRoute).AddNextStep(dab, uab)
+	br := NewTransactionalRoute(bRoute).AddNextStep("1", dab, uab)
 
 	ctx, _ := NewContext()
 	_ = orch.Register(ar)
@@ -94,8 +94,8 @@ func TestOrchestrator_Exec_RollbackBetweenTransactionalRoute(t *testing.T) {
 	}()
 
 	orch := NewOrchestrator()
-	ar := NewTransactionalRoute(aRoute).AddNextStep(daa, uaa).To(bRoute)
-	br := NewTransactionalRoute(bRoute).AddNextStep(dab, uab)
+	ar := NewTransactionalRoute(aRoute).AddNextStep("1", daa, uaa).To(bRoute)
+	br := NewTransactionalRoute(bRoute).AddNextStep("1", dab, uab)
 
 	ctx, _ := NewContext()
 	_ = orch.Register(ar)

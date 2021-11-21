@@ -6,22 +6,22 @@ import (
 )
 
 func TestCounting(t *testing.T) {
-	c := newCounter()
+	c := newLabelGenerator("")
 
-	r1 := c.next()
+	r1 := c.getLabel()
 	assert.Equal(t, "1", r1)
 
-	r2 := c.next()
+	r2 := c.getLabel()
 	assert.Equal(t, "2", r2)
 
-	c.subVersioning()
-	r3 := c.next()
+	c.hasChild()
+	r3 := c.getLabel()
 	assert.Equal(t, "2.1", r3)
 
-	r4 := c.next()
+	r4 := c.getLabel()
 	assert.Equal(t, "2.2", r4)
 
-	c.endSubVersioning()
-	r5 := c.next()
+	c.endChild()
+	r5 := c.getLabel()
 	assert.Equal(t, "3", r5)
 }

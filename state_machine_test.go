@@ -38,7 +38,7 @@ func TestHappyScenario(t *testing.T) {
 	assert.Equal(t, true, hasNext)
 	assert.Equal(t, s2, sm.state)
 
-	// move to next state
+	// move to getLabel state
 	hasNext, _ = sm.doAction()
 	assert.Equal(t, s2, sm.state)
 	assert.Equal(t, false, hasNext)

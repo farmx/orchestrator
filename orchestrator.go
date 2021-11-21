@@ -105,7 +105,7 @@ func (o *orchestrator) defineHierarchicalRouteTransitions() error {
 			if reflect.TypeOf(o.routes[e.To]) == reflect.TypeOf(&TransactionalRoute{}) {
 				o.routes[e.To].GetStartState().createTransition(e.State, Default,
 					func(ctx context) bool {
-						return ctx.GetVariable(TrStatusHeaderKey) == TrRollback
+						return ctx.GetVariable(transactionStatusHeaderKey) == transactionStatusRollback
 					})
 			}
 		}
