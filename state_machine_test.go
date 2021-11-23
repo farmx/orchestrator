@@ -104,6 +104,7 @@ func TestLoop(t *testing.T) {
 	assert.Equal(t, false, hasNext)
 	assert.Equal(t, s2, sm.state)
 }
+
 //  /---->S3---------\
 // S1--->S2--->S4--->S5
 //  \----------------/
@@ -158,12 +159,12 @@ func TestComplexCondition(t *testing.T) {
 			return false
 		})
 
-	s2.createTransition(s4,1,
+	s2.createTransition(s4, 1,
 		func(ctx context) bool {
 			return true
 		})
 
-	s4.createTransition(s5,1,
+	s4.createTransition(s5, 1,
 		func(ctx context) bool {
 			return true
 		})

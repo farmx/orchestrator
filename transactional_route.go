@@ -3,10 +3,8 @@ package orchestrator
 import "fmt"
 
 const (
-	transactionStatusHeaderKey  = "TRANSACTION_STATUS"
-	transactionStatusRollback   = "ROLLBACK"
-	transactionStatusInProgress = "IN_PROGRESS"
-	transactionStatusEnd        = "END"
+	transactionalRouteStatusHeaderKey = "TRANSACTIONAL_ROUTE_STATUS"
+	transactionalRouteStatusRollback  = "ROLLBACK"
 )
 
 type (
@@ -32,20 +30,20 @@ type (
 
 	// force to present AddNextStep method only
 	onlyTRAddNextStep interface {
-		AddNextStep(name string, doAction func(ctx *context) error, undoAction func(ctx context)) *TransactionalRoute
+		AddNextStep(name string, doAction func(ctx *context) error, undoAction func(ctx context) error) *TransactionalRoute
 	}
 )
 
 // NewTransactionalRoute define and return a TransactionalRoute
 func NewTransactionalRoute(id string) *TransactionalRoute {
 	return &TransactionalRoute{
-		id:             id,
-		routeState:          Main,
+		id:         id,
+		routeState: Main,
 	}
 }
 
 // AddNextStep add new step to TransactionalRoute
-func (tr *TransactionalRoute) AddNextStep(name string, doAction func(ctx *context) error, undoAction func(ctx context)) *TransactionalRoute {
+func (tr *TransactionalRoute) AddNextStep(name string, doAction func(ctx *context) error, undoAction func(ctx context) error) *TransactionalRoute {
 	s := &State{
 		name:   fmt.Sprintf("%s_%s", tr.id, name),
 		action: tr.defineAction(doAction, undoAction),
@@ -62,13 +60,14 @@ func (tr *TransactionalRoute) AddNextStep(name string, doAction func(ctx *contex
 		tr.addNextStepAfterEnd(s)
 		break
 	default:
+		// first state must be define as a start start (root)
 		if tr.startState == nil {
 			tr.startState = s
 			break
 		}
 
 		tr.defineTwoWayTransition(tr.lastState, Default, func(ctx context) bool {
-			return ctx.GetVariable(transactionStatusHeaderKey) != transactionStatusRollback
+			return ctx.GetVariable(transactionalRouteStatusHeaderKey) != transactionalRouteStatusRollback
 		}, s)
 	}
 
@@ -158,11 +157,10 @@ func (tr *TransactionalRoute) GetEndpoints() []*Endpoint {
 	return tr.endpoints
 }
 
-func (tr *TransactionalRoute) defineAction(doAction func(ctx *context) error, undoAction func(ctx context)) func(ctx *context) error {
+func (tr *TransactionalRoute) defineAction(doAction func(ctx *context) error, undoAction func(ctx context) error) func(ctx *context) error {
 	return func(ctx *context) error {
-		if ctx.GetVariable(transactionStatusHeaderKey) == transactionStatusRollback {
-			undoAction(*ctx)
-			return nil
+		if ctx.GetVariable(transactionalRouteStatusHeaderKey) == transactionalRouteStatusRollback {
+			return undoAction(*ctx)
 		}
 
 		return doAction(ctx)
@@ -172,14 +170,14 @@ func (tr *TransactionalRoute) defineAction(doAction func(ctx *context) error, un
 func (tr *TransactionalRoute) defineTwoWayTransition(src *State, priority int, predicate func(context) bool, dst *State) {
 	// define a Transition form src State to dst State
 	src.createTransition(dst, priority,
-		 func(ctx context) bool {
-			return predicate(ctx) && ctx.GetVariable(transactionStatusHeaderKey) != transactionStatusRollback
+		func(ctx context) bool {
+			return predicate(ctx) && ctx.GetVariable(transactionalRouteStatusHeaderKey) != transactionalRouteStatusRollback
 		})
 
 	// define a Transition from dst to src State for rollback
 	dst.createTransition(src, Default,
 		func(ctx context) bool {
-			return ctx.GetVariable(transactionStatusHeaderKey) == transactionStatusRollback
+			return ctx.GetVariable(transactionalRouteStatusHeaderKey) == transactionalRouteStatusRollback
 		})
 }
 
@@ -187,7 +185,7 @@ func (tr *TransactionalRoute) getEachTransitionLatestState(state *State) []*Stat
 	var result []*State
 	for _, t := range state.transitions {
 		if t.priority == Condition {
-			result = append(result, getLatestState(t.to))
+			result = append(result, tr.getLatestState(t.to))
 		}
 	}
 
@@ -195,13 +193,13 @@ func (tr *TransactionalRoute) getEachTransitionLatestState(state *State) []*Stat
 }
 
 // looking for latest state
-func getLatestState(state *State) *State {
-	for _, tr := range state.transitions {
+func (tr *TransactionalRoute) getLatestState(state *State) *State {
+	for _, st := range state.transitions {
 		ctx, _ := NewContext()
-		ctx.SetVariable(transactionStatusHeaderKey, transactionStatusRollback)
+		ctx.SetVariable(transactionalRouteStatusHeaderKey, transactionalRouteStatusRollback)
 		// choose happy path transition
-		if tr.priority == Default && !tr.shouldTakeTransition(*ctx) {
-			return getLatestState(tr.to)
+		if st.priority == Default && !st.shouldTakeTransition(*ctx) {
+			return tr.getLatestState(st.to)
 		}
 	}
 

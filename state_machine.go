@@ -7,8 +7,8 @@ import (
 
 type (
 	statemachine struct {
-		state              *State
-		context            *context
+		state   *State
+		context *context
 	}
 
 	State struct {
@@ -55,8 +55,8 @@ func (sm *statemachine) getMemento() (*State, context) {
 
 func (s *State) createTransition(to *State, priority int, shouldTakeTransition func(ctx context) bool) {
 	s.transitions = append(s.transitions, Transition{
-		to:       to,
-		priority: priority,
+		to:                   to,
+		priority:             priority,
 		shouldTakeTransition: shouldTakeTransition,
 	})
 }

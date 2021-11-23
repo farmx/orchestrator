@@ -5,13 +5,13 @@ import (
 )
 
 type labelGenerator struct {
-	prefix string
+	prefix   string
 	versions []int
 }
 
 func newLabelGenerator(prefix string) *labelGenerator {
 	return &labelGenerator{
-		prefix: prefix,
+		prefix:   prefix,
 		versions: []int{0},
 	}
 }

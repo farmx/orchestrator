@@ -27,7 +27,7 @@ func (rr *routeRunner) run(ctx *context, errCh chan<- error) {
 
 	rr.statemachine.init(rr.routeRootState, ctx)
 
-	for hasNext := true ;  hasNext == true; hasNext, err = rr.statemachine.doAction() {
+	for hasNext := true; hasNext == true; hasNext, err = rr.statemachine.doAction() {
 		mst, mctx := rr.statemachine.getMemento()
 
 		if errCh != nil && err != nil {
@@ -38,7 +38,7 @@ func (rr *routeRunner) run(ctx *context, errCh chan<- error) {
 		if err != nil && rr.recoveryRootState != nil {
 			rr.statemachine.init(rr.recoveryRootState, &mctx)
 
-			for rcHasNext := true ;  rcHasNext == true; rcHasNext, err = rr.statemachine.doAction() {
+			for rcHasNext := true; rcHasNext == true; rcHasNext, err = rr.statemachine.doAction() {
 				errCh <- err
 			}
 

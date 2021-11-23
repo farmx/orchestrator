@@ -23,8 +23,9 @@ func TestOrchestrator_Exec_HandoverBetweenRoutes(t *testing.T) {
 		return nil
 	}
 
-	uaa := func(ctx context) {
+	uaa := func(ctx context) error {
 		ctx.SetVariable("A", ctx.GetVariable("A").(int)-1)
+		return nil
 	}
 
 	dab := func(ctx *context) error {
@@ -39,8 +40,9 @@ func TestOrchestrator_Exec_HandoverBetweenRoutes(t *testing.T) {
 		return nil
 	}
 
-	uab := func(ctx context) {
+	uab := func(ctx context) error {
 		ctx.SetVariable("A", ctx.GetVariable("B").(int)-1)
+		return nil
 	}
 
 	orch := NewOrchestrator()
@@ -73,8 +75,9 @@ func TestOrchestrator_Exec_RollbackBetweenTransactionalRoute(t *testing.T) {
 		return nil
 	}
 
-	uaa := func(ctx context) {
+	uaa := func(ctx context) error {
 		log.Print("UAA")
+		return nil
 	}
 
 	dab := func(ctx *context) error {
@@ -82,8 +85,9 @@ func TestOrchestrator_Exec_RollbackBetweenTransactionalRoute(t *testing.T) {
 		return errors.New("fake error")
 	}
 
-	uab := func(ctx context) {
+	uab := func(ctx context) error {
 		log.Print("UAB")
+		return nil
 	}
 
 	errChan := make(chan error)

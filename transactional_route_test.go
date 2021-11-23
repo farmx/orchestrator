@@ -10,12 +10,12 @@ func doActionTest(ctx *context) error {
 		ctx.SetVariable("HK", 0)
 	}
 
-	ctx.SetVariable("HK", ctx.GetVariable("HK").(int) + 1)
+	ctx.SetVariable("HK", ctx.GetVariable("HK").(int)+1)
 	return nil
 }
 
-func undoActionTest(ctx context) {
-
+func undoActionTest(ctx context) error {
+	return nil
 }
 
 func execTestRoute(route *State) *routeRunner {
@@ -26,7 +26,7 @@ func execTestRoute(route *State) *routeRunner {
 	return runner
 }
 
-func TestDefineUnconditionalRoute(t *testing.T) {
+func TestDefineUnconditionalTransactionalRoute(t *testing.T) {
 	r := NewTransactionalRoute("TEST_ROUTE").
 		AddNextStep("1", doActionTest, undoActionTest).
 		AddNextStep("2", doActionTest, undoActionTest).
@@ -37,7 +37,7 @@ func TestDefineUnconditionalRoute(t *testing.T) {
 	assert.Equal(t, 3, rr.statemachine.context.GetVariable("HK"))
 }
 
-func TestDefineConditionalRoute(t *testing.T) {
+func TestDefineConditionalTransactionalRoute(t *testing.T) {
 	r := NewTransactionalRoute("TEST_ROUTE").
 		AddNextStep("1", doActionTest, undoActionTest).
 		AddNextStep("2", doActionTest, undoActionTest).
@@ -63,7 +63,7 @@ func TestDefineConditionalRoute(t *testing.T) {
 	assert.Equal(t, 2, rh.statemachine.context.GetVariable("HK"))
 }
 
-func TestDefineNestedConditionalRoute(t *testing.T) {
+func TestDefineNestedConditionalTransactionalRoute(t *testing.T) {
 	r := NewTransactionalRoute("TEST_ROUTE").
 		AddNextStep("1", doActionTest, undoActionTest).
 		AddNextStep("2", doActionTest, undoActionTest).
@@ -79,7 +79,7 @@ func TestDefineNestedConditionalRoute(t *testing.T) {
 	assert.Equal(t, 6, rh.statemachine.context.GetVariable("HK"))
 }
 
-func TestDefineConditionWithOtherwiseRoute(t *testing.T) {
+func TestDefineConditionWithOtherwiseTransactionalRoute(t *testing.T) {
 	r := NewTransactionalRoute("TEST_ROUTE").
 		AddNextStep("1", doActionTest, undoActionTest).
 		AddNextStep("2", doActionTest, undoActionTest).
@@ -96,7 +96,7 @@ func TestDefineConditionWithOtherwiseRoute(t *testing.T) {
 	assert.Equal(t, 4, rh.statemachine.context.GetVariable("HK"))
 }
 
-func TestDefineConditionWithOtherwiseAndEndRoute(t *testing.T) {
+func TestDefineConditionWithOtherwiseAndEndTransactionalRoute(t *testing.T) {
 	r := NewTransactionalRoute("TEST_ROUTE").
 		AddNextStep("1", doActionTest, undoActionTest).
 		AddNextStep("2", doActionTest, undoActionTest).
@@ -112,7 +112,7 @@ func TestDefineConditionWithOtherwiseAndEndRoute(t *testing.T) {
 	assert.Equal(t, 5, rh.statemachine.context.GetVariable("HK"))
 }
 
-func TestDefineRoute(t *testing.T) {
+func TestDefineTransactionalRoute(t *testing.T) {
 	r := NewTransactionalRoute("TEST_ROUTE").
 		AddNextStep("1", doActionTest, undoActionTest).
 		When(func(ctx context) bool { return true }).
